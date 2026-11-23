@@ -263,6 +263,23 @@ dd li::before{content:"+ ";color:var(--bl)}
 .fb.md{display:block;padding:0;overflow:hidden;background:#000}
 .fb.md img,.fb.md video{display:block}
 .fb a{text-decoration:underline}
+/* ===== Réalisations immersives : scène sticky + défilement synchronisé ===== */
+#realisations{overflow:visible;overflow-x:clip}
+.pd{will-change:transform,opacity}
+.scr iframe{pointer-events:none;will-change:transform}
+.fb.md img.sh{will-change:transform}
+.pd::before{content:"";position:absolute;inset:-20%;z-index:1;pointer-events:none;mix-blend-mode:screen;background:radial-gradient(38% 28% at calc(18% + var(--p,0) * 64%) 20%,rgba(255,255,255,.09),transparent 70%)}
+.pgr{position:absolute;right:12px;top:18%;bottom:18%;width:2px;z-index:3;border-radius:2px;background:rgba(255,255,255,.14);overflow:hidden;pointer-events:none}
+.pgr i{position:absolute;left:0;top:0;width:100%;height:calc(var(--p,0) * 100%);background:#fff;box-shadow:0 0 12px rgba(255,255,255,.7)}
+@keyframes nxup{from{opacity:0;transform:translate3d(0,26px,0);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.px.in .pi>*{animation:nxup 1.1s var(--e) backwards}
+.px.in .pi>:nth-child(2){animation-delay:.08s}.px.in .pi>:nth-child(3){animation-delay:.16s}.px.in .pi>:nth-child(4){animation-delay:.24s}.px.in .pi>:nth-child(n+5){animation-delay:.32s}
+@media(prefers-reduced-motion:reduce){.px.in .pi>*{animation:none}.pd::before{display:none}}
+@media(min-width:1025px){
+ .px{grid-template-columns:minmax(0,4fr) minmax(0,8fr);align-items:start;min-height:calc(100svh + 150vh)}
+ .px:nth-child(even){grid-template-columns:minmax(0,8fr) minmax(0,4fr)}
+ .pd{position:sticky;top:calc(var(--nav) + 20px);height:min(calc(100svh - var(--nav) - 52px),50vw,780px)}
+}
 
 /* ===== 10. EXPERTISES ===== */
 #xp{counter-reset:x}
@@ -898,11 +915,11 @@ regPx();
 const pj=$("#pj");
 function drawProjects(){pj.innerHTML="";PROJECTS.forEach((p,i)=>pj.insertAdjacentHTML("beforeend",`<article class="px rv" data-i="${i}"><span class="pnum" aria-hidden="true" data-px="-.05">${String(i+1).padStart(2,"0")}</span><div class="pi"><p class="k">${esc(p.sector)}</p><h3>${esc(p.name)}</h3><p class="tg">${p.status==="concept"?"Concept NEXORA, non livré à un client":"Projet livré"}</p><p class="pdesc">${esc(p.intro)}</p><dl>${p.need?`<dt>Le besoin</dt><dd>${esc(p.need)}</dd>`:""}${p.work?`<dt>Le travail effectué</dt><dd>${esc(p.work)}</dd>`:""}${p.features.length?`<dt>Fonctionnalités</dt><dd><ul>${p.features.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></dd>`:""}</dl><div class="ca"><div class="sw" role="group" aria-label="Format de l’aperçu"><button type="button" data-m="d" aria-pressed="true">Ordinateur</button><button type="button" data-m="m" aria-pressed="false">Mobile</button></div>${p.url?`<a class="cta ar" href="${esc(p.url)}" target="_blank" rel="noopener">Découvrir le site</a>`:""}</div></div><div class="pd"><div class="dev d"><div class="bar"><i></i><i></i><i></i><span>${esc(p.doc?"aperçu local":p.video?"vidéo de présentation":p.url?p.url.replace(/^https?:\/\//,""):"aperçu")}</span></div><div class="scr"><iframe title="Aperçu : ${esc(p.name)}" sandbox="${p.doc?"allow-scripts":"allow-scripts allow-same-origin allow-forms allow-popups"}" referrerpolicy="no-referrer"></iframe><div class="fb" hidden></div></div></div></div></article>`));
  if(!PROJECTS.length)pj.innerHTML='<p class="mu">Les premières réalisations seront publiées prochainement.</p>';
- else{$$(".px").forEach(a=>{fit(a,"d");lz.observe(a);ro.observe(a);if(!RM)rs.observe(a)});regPx();ask()}}
+ else{$$(".px").forEach(a=>{fit(a,"d");lz.observe(a);ro.observe(a);if(!RM)rs.observe(a)});regPx();ask();NXimm()}}
 function fit(a,m){const p=PROJECTS[a.dataset.i],st=$(".pd",a),dv=$(".dev",a),f=$("iframe",a),W=st.clientWidth,H=st.clientHeight,d=m==="d",
  fw=d?W:Math.min(W,H*.5),fh=d?Math.min(H,W*.64):H,bd=d?1:2,pd=d?0:10,vw=d?1440:390,k=(fw-2*bd-2*pd)/vw;
  dv.style.width=fw+"px";dv.style.height=fh+"px";dv.className="dev "+m;
- if(f){f.style.width=vw+"px";f.style.height=(fh-2*bd-2*pd-(d?30:0))/k+"px";f.style.transform=`scale(${k})`}
+ if(f){f.style.width=vw+"px";f.style.height=(fh-2*bd-2*pd-(d?30:0))/k*NXTL+"px";f._k=k;f.style.transform=`scale(${k})`;nxm(a)}
  const im=$(".fb img.sh",a);if(im)im.src=p.shot[m]||p.shot.d}
 /* Ordre de priorité de l'aperçu :
    1. code HTML collé  2. vidéo  3. site en ligne  4. captures  5. galerie  6. lien seul */
@@ -911,7 +928,7 @@ function load(a){const p=PROJECTS[a.dataset.i],f=$("iframe",a),fb=$(".fb",a);
  if(p.doc){f.srcdoc=p.doc;return}
  if(p.video){media(`<video src="${esc(p.video)}" ${RM?"controls":"autoplay muted loop playsinline"} preload="metadata" title="Vidéo : ${esc(p.name)}" style="width:100%;height:100%;object-fit:contain;background:#000"></video>`);return}
  if(p.url&&p.embed){f.src=p.url;f.onload=()=>f.dataset.ok=1;setTimeout(()=>{if(!f.dataset.ok)fb.hidden=false},9000);fb.innerHTML=`Aperçu indisponible ? <a href="${esc(p.url)}" target="_blank" rel="noopener">Ouvrir le site</a>`;return}
- if(p.shot.d||p.shot.m){media(`<img class="sh" alt="Capture de ${esc(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:top" src="${esc(p.shot.d||p.shot.m)}">`);return}
+ if(p.shot.d||p.shot.m){media(`<img class="sh" alt="Capture de ${esc(p.name)}" style="display:block;width:100%;height:auto;min-height:100%;object-fit:cover;object-position:top" src="${esc(p.shot.d||p.shot.m)}">`);return}
  if(p.gallery.length){media(p.gallery.map((u,i)=>`<img alt="${esc(p.name)} — visuel ${i+1}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;opacity:${i?0:1};transition:opacity 1.1s var(--e)" src="${esc(u)}">`).join(""));
   if(!RM&&p.gallery.length>1){const im=$$("img",fb);let k=0;setInterval(()=>{im[k].style.opacity=0;k=(k+1)%im.length;im[k].style.opacity=1},3800)}
   return}
@@ -920,6 +937,23 @@ const lz=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){load(e
 pj.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;const a=b.closest(".px"),s=$(".scr",a);
  $$("[data-m]",a).forEach(x=>x.setAttribute("aria-pressed",x===b));a.dataset.mode=b.dataset.m;fit(a,b.dataset.m);
  if(!RM){s.classList.add("f");setTimeout(()=>s.classList.remove("f"),650)}});
+
+/* ===== Réalisations immersives : le contenu de l'écran suit le scroll de la page ===== */
+const NXTL=3,nxc=(v,a,b)=>Math.min(b,Math.max(a,v));
+function nxm(a){const p=a._p||0,s=$(".scr",a),f=$("iframe",a),im=$(".fb img.sh",a),v=s.clientHeight;
+ if(f&&f.isConnected&&f._k){const t=parseFloat(f.style.height)*f._k;f.style.transform=`translate3d(0,${-(p*Math.max(0,t-v)).toFixed(1)}px,0) scale(${f._k})`}
+ else if(im&&im.offsetHeight)im.style.transform=`translate3d(0,${-(p*Math.max(0,im.offsetHeight-v)).toFixed(1)}px,0)`}
+let nxk=0;
+function nxy(){nxk=0;const big=innerWidth>1024,vh=innerHeight,top=(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nav"))||72)+20;
+ $$(".px").forEach(a=>{const r=a.getBoundingClientRect();if(r.bottom<-300||r.top>vh+300)return;
+  const pd=$(".pd",a);let p,en=1,ex=0;
+  if(big){p=nxc((top-r.top)/Math.max(1,r.height-pd.offsetHeight-top-52),0,1);en=nxc((vh-r.top)/(vh*.6),0,1);ex=nxc((p-.9)/.1,0,1)}
+  else p=nxc((nxc((vh-r.top)/(vh+r.height),0,1)-.12)/.76,0,1);
+  a._p=p;a.style.setProperty("--p",p.toFixed(3));nxm(a);
+  if(!RM){pd.style.opacity=(1-ex*.55).toFixed(3);pd.style.transform=`scale(${(.9+.1*en-ex*.04).toFixed(3)})`}})}
+const nxs=()=>{if(!nxk)nxk=requestAnimationFrame(nxy)};
+addEventListener("scroll",nxs,{passive:true});addEventListener("resize",nxs,{passive:true});pj.addEventListener("load",nxs,true);
+function NXimm(){$$(".px").forEach(a=>{if(!$(".pgr",a))$(".pd",a).insertAdjacentHTML("beforeend",'<span class="pgr" aria-hidden="true"><i></i></span>');const f=$("iframe",a);if(f)f.setAttribute("scrolling","no")});nxs()}
 
 /* ===== Expertises, formulaire, contact ===== */
 $$("#xp li").forEach((li,i)=>{const b=$(".xb",li),d=$(".xd",li);d.id="x"+i;b.setAttribute("aria-controls","x"+i);b.onclick=()=>{const o=!li.classList.contains("o");li.classList.toggle("o",o);b.setAttribute("aria-expanded",o);ask()}});
