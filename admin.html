@@ -46,7 +46,7 @@ const ST={nouveau:"Nouveau",en_cours:"En cours",repondu:"Répondu",termine:"Term
 const PF=[["name","Nom du projet","text"],["client_name","Nom du client","text"],["sector","Secteur d’activité","text"],["category","Catégorie","text"],["completed_on","Date de réalisation","date"],["description","Description","a"],["problem","Problématique du client","a"],["intervention","Notre intervention","a"],["features","Fonctionnalités (une par ligne)","a"],["site_url","URL du site réalisé","url"],["local_doc","Aperçu local · code HTML de la création (laisser vide si non utilisé)","a"]];
 const pf=()=>HASDOC?PF:PF.filter(x=>x[0]!=="local_doc");
 const PM=[["cover_url","Image principale","projets"],["logo_url","Logo du client","logos"],["desktop_shot","Capture ordinateur","projets"],["mobile_shot","Capture mobile","projets"]];
-const AC=[["color_bg","Fond ivoire","#F7F6F2"],["color_ink","Texte principal","#20232B"],["color_blue","Bleu électrique","#4965FF"],["color_deep","Bleu profond","#243B9B"],["color_lav","Lavande","#B8B9FF"]];
+const AC=[["color_bg","Fond (sombre)","#07070B"],["color_ink","Texte principal (clair)","#F4F3F0"],["color_blue","Accent vif","#FFFFFF"],["color_deep","Gris moyen","#A8A8B4"],["color_lav","Gris clair","#D6D6DE"]];
 const AI=[["logo_url","Logo du site (en-tête et pied de page)","logos"],["img_hero","Image de fond de l’accueil","fonds"],["img_vision","Image · Notre vision","sections"],["img_expertises","Image · Expertises","sections"],["img_pourquoi","Image · Pourquoi NEXORA","sections"],["img_contact","Image · Contact","sections"]];
 const CK=[["contact_email","Coordonnées › Adresse e-mail"],["contact_tel","Coordonnées › Téléphone"],["contact_address","Coordonnées › Adresse postale"],["social_instagram","Réseaux sociaux › Instagram (URL https)"],["social_linkedin","Réseaux sociaux › LinkedIn (URL https)"],["social_facebook","Réseaux sociaux › Facebook (URL https)"],["legal_url","Pied de page › Lien Mentions légales (URL https)"],["privacy_url","Pied de page › Lien Confidentialité (URL https)"]];
 
@@ -185,6 +185,4 @@ V.addEventListener("submit",async e=>{e.preventDefault();const F=e.target;
 if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY||!window.supabase){view("login");say("config.js n’est pas renseigné : ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.",1)}
 else{sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);enter()}
 </script></body></html>
-
-
 
