@@ -45,7 +45,7 @@ const fmt=d=>d?new Date(d).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"
 const ST={nouveau:"Nouveau",en_cours:"En cours",repondu:"Répondu",termine:"Terminé"},FD=["logos","fonds","sections","projets","galerie","videos","divers"];
 const PF=[["name","Nom du projet","text"],["client_name","Nom du client","text"],["sector","Secteur d’activité","text"],["category","Catégorie","text"],["completed_on","Date de réalisation","date"],["description","Description","a"],["problem","Problématique du client","a"],["intervention","Notre intervention","a"],["features","Fonctionnalités (une par ligne)","a"],["site_url","URL du site réalisé","url"],["local_doc","Aperçu local · code HTML de la création (laisser vide si non utilisé)","a"]];
 const pf=()=>HASDOC?PF:PF.filter(x=>x[0]!=="local_doc");
-const PM=[["cover_url","Image principale","projets"],["logo_url","Logo du client","logos"],["desktop_shot","Capture ordinateur","projets"],["mobile_shot","Capture mobile","projets"]];
+const PM=[["cover_url","Image principale","projets"],["logo_url","Logo du client","logos"],["desktop_shot","Capture ordinateur — s’affiche dans l’aperçu","projets"],["mobile_shot","Capture mobile — s’affiche dans l’aperçu","projets"]];
 const AC=[["color_bg","Fond (sombre)","#07070B"],["color_ink","Texte principal (clair)","#F4F3F0"],["color_blue","Accent vif","#FFFFFF"],["color_deep","Gris moyen","#A8A8B4"],["color_lav","Gris clair","#D6D6DE"]];
 const AI=[["logo_url","Logo du site (en-tête et pied de page)","logos"],["img_hero","Image de fond de l’accueil","fonds"],["img_vision","Image · Notre vision","sections"],["img_expertises","Image · Expertises","sections"],["img_pourquoi","Image · Pourquoi NEXORA","sections"],["img_contact","Image · Contact","sections"]];
 const CK=[["contact_email","Coordonnées › Adresse e-mail"],["contact_tel","Coordonnées › Téléphone"],["contact_address","Coordonnées › Adresse postale"],["social_instagram","Réseaux sociaux › Instagram (URL https)"],["social_linkedin","Réseaux sociaux › LinkedIn (URL https)"],["social_facebook","Réseaux sociaux › Facebook (URL https)"],["legal_url","Pied de page › Lien Mentions légales (URL https)"],["privacy_url","Pied de page › Lien Confidentialité (URL https)"]];
@@ -101,10 +101,20 @@ async function projs(){const{data,error}=await sb.from("projects").select("*").o
  $("#v").innerHTML=`<p><button data-a="new">Ajouter un projet</button></p>`+(rows.map((p,i)=>`<div class="card"><div class="row"><strong>${esc(p.name)}</strong><span class="tag">${p.status==="publie"?"Publié":"Brouillon"}</span>${p.is_concept?'<span class="tag">Concept NEXORA</span>':""}</div>
  <div class="row" style="margin-top:8px"><button class="o" data-a="edit" data-i="${i}">Modifier</button><button class="o" data-a="tog" data-i="${i}">${p.status==="publie"?"Dépublier":"Publier"}</button><button class="o" data-a="up" data-i="${i}" aria-label="Monter" ${i?"":"disabled"}>↑</button><button class="o" data-a="dn" data-i="${i}" aria-label="Descendre" ${i<rows.length-1?"":"disabled"}>↓</button><a class="b o" href="index.html?preview=1#realisations" target="_blank" rel="noopener">Aperçu</a><button class="r" data-a="del" data-i="${i}">Supprimer</button></div></div>`).join("")||'<div class="card mu">Aucune réalisation. Ajoutez votre premier projet.</div>')}
 function form(p){p=p||{is_concept:true,status:"brouillon",features:[],gallery:[]};
- $("#v").innerHTML=`<form id="pf" class="card"><h2>${p.id?"Modifier":"Ajouter"} un projet</h2>${pf().map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}"${k==="local_doc"?' rows="12" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:220px"':""}>${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
+ $("#v").innerHTML=`<form id="pf" class="card"><h2>${p.id?"Modifier":"Ajouter"} un projet</h2>
+ <details class="card" style="background:#f4f4ff"><summary>Comment remplir l’aperçu ?</summary>
+ <p class="mu">L’aperçu de la section Réalisations accepte cinq sources. Si vous en remplissez plusieurs, celle du haut l’emporte :</p>
+ <ol class="mu" style="padding-left:20px">
+  <li><strong>Aperçu local</strong> — le code HTML de votre création, collé. Idéal pour une maquette.</li>
+  <li><strong>Vidéo de présentation</strong> — lecture automatique, en boucle, sans son.</li>
+  <li><strong>URL du site réalisé</strong> — le vrai site, affiché en direct. Certains sites refusent d’être intégrés : prévoyez une capture en secours.</li>
+  <li><strong>Capture ordinateur / mobile</strong> — une image par format.</li>
+  <li><strong>Galerie de photos</strong> — diaporama qui défile tout seul.</li>
+ </ol>
+ <p class="mu">Si rien n’est rempli, l’aperçu affiche « Aperçu à venir ». L’URL du site sert aussi au bouton « Découvrir le site », même si l’aperçu vient d’ailleurs.</p></details>${pf().map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}"${k==="local_doc"?' rows="12" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:220px"':""}>${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
  ${HASDOC?'<p class="mu">Collez ici le code HTML complet de votre création : il s’affiche dans l’aperçu de la section Réalisations, en format ordinateur comme en format mobile. Prioritaire sur l’URL et les captures.</p><div class="row"><button type="button" class="o" data-a="pvd">Aperçu ordinateur</button><button type="button" class="o" data-a="pvm">Aperçu mobile</button><button type="button" class="o" data-a="pvx">Masquer</button></div><div id="lp"></div>':'<p class="mu">Aperçu local indisponible : la colonne <code>local_doc</code> n’existe pas encore dans la table <code>projects</code>. Exécutez le script SQL fourni, puis rechargez cette page.</p>'}
- ${PM.map(([k,l,f])=>mf(k,l,p[k]||"",f)).join("")}${mf("video_url","Vidéo de présentation (facultatif)",p.video_url||"","videos",1)}
- <label>Galerie de photos</label><div class="th" id="gl"></div><div class="row"><button type="button" class="o" data-a="ga">Importer des photos</button><button type="button" class="o" data-a="gp">Depuis la bibliothèque</button></div>
+ ${PM.map(([k,l,f])=>mf(k,l,p[k]||"",f)).join("")}${mf("video_url","Vidéo de présentation — s’affiche dans l’aperçu (MP4 ou WebM, 50 Mo max)",p.video_url||"","videos",1)}
+ <label>Galerie de photos — diaporama de l’aperçu, si aucune capture n’est fournie</label><div class="th" id="gl"></div><div class="row"><button type="button" class="o" data-a="ga">Importer des photos</button><button type="button" class="o" data-a="gp">Depuis la bibliothèque</button></div>
  <label><input type="checkbox" name="is_concept" ${p.is_concept?"checked":""}> Concept NEXORA (non livré à un client)</label>
  <label>Statut<select name="status"><option value="brouillon" ${p.status==="brouillon"?"selected":""}>Brouillon</option><option value="publie" ${p.status==="publie"?"selected":""}>Publié</option></select></label>
  <p class="row"><button type="submit">Enregistrer</button><button type="button" class="o" data-a="back">Annuler</button></p><p id="fs" class="mu" role="status"></p></form>`;
@@ -185,4 +195,6 @@ V.addEventListener("submit",async e=>{e.preventDefault();const F=e.target;
 if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY||!window.supabase){view("login");say("config.js n’est pas renseigné : ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.",1)}
 else{sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);enter()}
 </script></body></html>
+
+
 
