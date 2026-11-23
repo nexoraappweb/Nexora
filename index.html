@@ -266,6 +266,8 @@ dd li::before{content:"+ ";color:var(--bl)}
 .scr iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;background:var(--w)}
 .fb{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:20px;background:#F3F2EE;color:rgba(32,35,43,.62);font-size:14px}
 .fb[hidden]{display:none}
+.fb.md{display:block;padding:0;overflow:hidden;background:#000}
+.fb.md img,.fb.md video{display:block}
 .fb a{text-decoration:underline}
 
 /* ===== 10. EXPERTISES ===== */
@@ -592,18 +594,26 @@ regPx();
 
 /* ===== Portfolio : aperçus ordinateur / mobile ===== */
 const pj=$("#pj");
-function drawProjects(){pj.innerHTML="";PROJECTS.forEach((p,i)=>pj.insertAdjacentHTML("beforeend",`<article class="px rv" data-i="${i}"><span class="pnum" aria-hidden="true" data-px="-.05">${String(i+1).padStart(2,"0")}</span><div class="pi"><p class="k">${esc(p.sector)}</p><h3>${esc(p.name)}</h3><p class="tg">${p.status==="concept"?"Concept NEXORA, non livré à un client":"Projet livré"}</p><p class="pdesc">${esc(p.intro)}</p><dl>${p.need?`<dt>Le besoin</dt><dd>${esc(p.need)}</dd>`:""}${p.work?`<dt>Le travail effectué</dt><dd>${esc(p.work)}</dd>`:""}${p.features.length?`<dt>Fonctionnalités</dt><dd><ul>${p.features.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></dd>`:""}</dl><div class="ca"><div class="sw" role="group" aria-label="Format de l’aperçu"><button type="button" data-m="d" aria-pressed="true">Ordinateur</button><button type="button" data-m="m" aria-pressed="false">Mobile</button></div>${p.url?`<a class="cta ar" href="${esc(p.url)}" target="_blank" rel="noopener">Découvrir le site</a>`:""}</div></div><div class="pd"><div class="dev d"><div class="bar"><i></i><i></i><i></i><span>${esc(p.url?p.url.replace(/^https?:\/\//,""):"aperçu local")}</span></div><div class="scr"><iframe title="Aperçu : ${esc(p.name)}" sandbox="${p.doc?"allow-scripts":"allow-scripts allow-same-origin allow-forms allow-popups"}" referrerpolicy="no-referrer"></iframe><div class="fb" hidden></div></div></div></div></article>`));
+function drawProjects(){pj.innerHTML="";PROJECTS.forEach((p,i)=>pj.insertAdjacentHTML("beforeend",`<article class="px rv" data-i="${i}"><span class="pnum" aria-hidden="true" data-px="-.05">${String(i+1).padStart(2,"0")}</span><div class="pi"><p class="k">${esc(p.sector)}</p><h3>${esc(p.name)}</h3><p class="tg">${p.status==="concept"?"Concept NEXORA, non livré à un client":"Projet livré"}</p><p class="pdesc">${esc(p.intro)}</p><dl>${p.need?`<dt>Le besoin</dt><dd>${esc(p.need)}</dd>`:""}${p.work?`<dt>Le travail effectué</dt><dd>${esc(p.work)}</dd>`:""}${p.features.length?`<dt>Fonctionnalités</dt><dd><ul>${p.features.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></dd>`:""}</dl><div class="ca"><div class="sw" role="group" aria-label="Format de l’aperçu"><button type="button" data-m="d" aria-pressed="true">Ordinateur</button><button type="button" data-m="m" aria-pressed="false">Mobile</button></div>${p.url?`<a class="cta ar" href="${esc(p.url)}" target="_blank" rel="noopener">Découvrir le site</a>`:""}</div></div><div class="pd"><div class="dev d"><div class="bar"><i></i><i></i><i></i><span>${esc(p.doc?"aperçu local":p.video?"vidéo de présentation":p.url?p.url.replace(/^https?:\/\//,""):"aperçu")}</span></div><div class="scr"><iframe title="Aperçu : ${esc(p.name)}" sandbox="${p.doc?"allow-scripts":"allow-scripts allow-same-origin allow-forms allow-popups"}" referrerpolicy="no-referrer"></iframe><div class="fb" hidden></div></div></div></div></article>`));
  if(!PROJECTS.length)pj.innerHTML='<p class="mu">Les premières réalisations seront publiées prochainement.</p>';
  else{$$(".px").forEach(a=>{fit(a,"d");lz.observe(a);ro.observe(a)});regPx();ask()}}
 function fit(a,m){const p=PROJECTS[a.dataset.i],st=$(".pd",a),dv=$(".dev",a),f=$("iframe",a),W=st.clientWidth,H=st.clientHeight,d=m==="d",
  fw=d?W:Math.min(W,H*.5),fh=d?Math.min(H,W*.64):H,bd=d?1:2,pd=d?0:10,vw=d?1440:390,k=(fw-2*bd-2*pd)/vw;
  dv.style.width=fw+"px";dv.style.height=fh+"px";dv.className="dev "+m;
  if(f){f.style.width=vw+"px";f.style.height=(fh-2*bd-2*pd-(d?30:0))/k+"px";f.style.transform=`scale(${k})`}
- const im=$(".fb img",a);if(im)im.src=p.shot[m]||p.shot.d}
+ const im=$(".fb img.sh",a);if(im)im.src=p.shot[m]||p.shot.d}
+/* Ordre de priorité de l'aperçu :
+   1. code HTML collé  2. vidéo  3. site en ligne  4. captures  5. galerie  6. lien seul */
 function load(a){const p=PROJECTS[a.dataset.i],f=$("iframe",a),fb=$(".fb",a);
- if(p.doc)f.srcdoc=p.doc;
- else if(p.url&&p.embed){f.src=p.url;f.onload=()=>f.dataset.ok=1;setTimeout(()=>{if(!f.dataset.ok)fb.hidden=false},9000);fb.innerHTML=`Aperçu indisponible ? <a href="${esc(p.url)}" target="_blank" rel="noopener">Ouvrir le site</a>`}
- else{f.remove();fb.hidden=false;fb.innerHTML=p.shot&&(p.shot.d||p.shot.m)?`<img alt="Capture de ${esc(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:top" src="${esc(p.shot.d||p.shot.m)}">`:(p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">Ouvrir le site</a>`:"Aperçu à venir");fit(a,a.dataset.mode||"d")}}
+ const media=h=>{f.remove();fb.hidden=false;fb.className="fb md";fb.innerHTML=h;fit(a,a.dataset.mode||"d")};
+ if(p.doc){f.srcdoc=p.doc;return}
+ if(p.video){media(`<video src="${esc(p.video)}" ${RM?"controls":"autoplay muted loop playsinline"} preload="metadata" title="Vidéo : ${esc(p.name)}" style="width:100%;height:100%;object-fit:contain;background:#000"></video>`);return}
+ if(p.url&&p.embed){f.src=p.url;f.onload=()=>f.dataset.ok=1;setTimeout(()=>{if(!f.dataset.ok)fb.hidden=false},9000);fb.innerHTML=`Aperçu indisponible ? <a href="${esc(p.url)}" target="_blank" rel="noopener">Ouvrir le site</a>`;return}
+ if(p.shot.d||p.shot.m){media(`<img class="sh" alt="Capture de ${esc(p.name)}" style="width:100%;height:100%;object-fit:cover;object-position:top" src="${esc(p.shot.d||p.shot.m)}">`);return}
+ if(p.gallery.length){media(p.gallery.map((u,i)=>`<img alt="${esc(p.name)} — visuel ${i+1}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;opacity:${i?0:1};transition:opacity 1.1s var(--e)" src="${esc(u)}">`).join(""));
+  if(!RM&&p.gallery.length>1){const im=$$("img",fb);let k=0;setInterval(()=>{im[k].style.opacity=0;k=(k+1)%im.length;im[k].style.opacity=1},3800)}
+  return}
+ f.remove();fb.hidden=false;fb.innerHTML=p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">Ouvrir le site</a>`:"Aperçu à venir";fit(a,a.dataset.mode||"d")}
 const lz=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){load(e.target);lz.unobserve(e.target)}}),{rootMargin:"400px"});
 pj.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(!b)return;const a=b.closest(".px"),s=$(".scr",a);
  $$("[data-m]",a).forEach(x=>x.setAttribute("aria-pressed",x===b));a.dataset.mode=b.dataset.m;fit(a,b.dataset.m);
@@ -771,7 +781,7 @@ async function loadData(){if(!SB){drawProjects();return}
  if(PV)document.body.insertAdjacentHTML("beforeend",'<div id="pvb">Aperçu : modifications non publiées</div>');
  const pq=SB.from("projects").select("*").order("position"),[pr,sc,dr]=await Promise.all([PV?pq:pq.eq("status","publie"),SB.from("site_content").select("key,value"),PV?SB.from("site_drafts").select("key,value"):Promise.resolve({data:[]})]);
  if(pr.error){pj.innerHTML='<p class="mu">Réalisations momentanément indisponibles.</p>'}else{
-  PROJECTS=pr.data.map(r=>({name:r.name,sector:(PV&&r.status!=="publie"?"Brouillon · ":"")+(r.is_concept?"Concept NEXORA STUDIO":(r.sector||r.client_name||"")),status:r.is_concept?"concept":"delivered",intro:r.description||"",need:r.problem||"",work:r.intervention||"",features:r.features||[],url:r.site_url||"",doc:(r.local_doc||"").trim(),embed:!!r.site_url&&!r.desktop_shot&&!r.mobile_shot,shot:{d:r.desktop_shot||r.cover_url||"",m:r.mobile_shot||""}}));drawProjects()}
+  PROJECTS=pr.data.map(r=>({name:r.name,sector:(PV&&r.status!=="publie"?"Brouillon · ":"")+(r.is_concept?"Concept NEXORA STUDIO":(r.sector||r.client_name||"")),status:r.is_concept?"concept":"delivered",intro:r.description||"",need:r.problem||"",work:r.intervention||"",features:r.features||[],url:r.site_url||"",doc:(r.local_doc||"").trim(),video:/^https:\/\//.test(r.video_url||"")?r.video_url:"",gallery:Array.isArray(r.gallery)?r.gallery.filter(u=>/^https:\/\//.test(u)):[],embed:!!r.site_url&&!r.desktop_shot&&!r.mobile_shot,shot:{d:r.desktop_shot||r.cover_url||"",m:r.mobile_shot||""}}));drawProjects()}
  if(sc.error)return;const m={},ok=u=>/^https:\/\//.test(u||"");sc.data.forEach(r=>m[r.key]=r.value);(dr.data||[]).forEach(r=>m[r.key]=r.value);
  $$("[data-c]").forEach(el=>{if(m[el.dataset.c])setT(el,m[el.dataset.c])});
  $$("[data-img]").forEach(el=>{const u=m[el.dataset.img];if(ok(u)){el.style.backgroundImage=`url("${encodeURI(u)}")`;el.classList.add("on")}});
