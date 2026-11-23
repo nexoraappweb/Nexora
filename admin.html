@@ -38,12 +38,13 @@ dialog{width:min(760px,94vw);max-height:86vh;border:0;border-radius:16px;padding
 <script>
 "use strict";
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const C=window.NEXORA_CONFIG||{};let sb,rows=[],LIB=[];
+const C=window.NEXORA_CONFIG||{};let sb,rows=[],LIB=[],HASDOC=false;
 const say=(t,bad)=>{const n=$("#msg");n.textContent=t;n.className=bad?"bad":"ok";n.hidden=false;clearTimeout(say.t);say.t=setTimeout(()=>n.hidden=true,6000)};
 const view=v=>{$("#login").hidden=v!=="login";$("#app").hidden=v!=="app"};
 const fmt=d=>d?new Date(d).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"}):"";
 const ST={nouveau:"Nouveau",en_cours:"En cours",repondu:"Répondu",termine:"Terminé"},FD=["logos","fonds","sections","projets","galerie","videos","divers"];
-const PF=[["name","Nom du projet","text"],["client_name","Nom du client","text"],["sector","Secteur d’activité","text"],["category","Catégorie","text"],["completed_on","Date de réalisation","date"],["description","Description","a"],["problem","Problématique du client","a"],["intervention","Notre intervention","a"],["features","Fonctionnalités (une par ligne)","a"],["site_url","URL du site réalisé","url"]];
+const PF=[["name","Nom du projet","text"],["client_name","Nom du client","text"],["sector","Secteur d’activité","text"],["category","Catégorie","text"],["completed_on","Date de réalisation","date"],["description","Description","a"],["problem","Problématique du client","a"],["intervention","Notre intervention","a"],["features","Fonctionnalités (une par ligne)","a"],["site_url","URL du site réalisé","url"],["local_doc","Aperçu local · code HTML de la création (laisser vide si non utilisé)","a"]];
+const pf=()=>HASDOC?PF:PF.filter(x=>x[0]!=="local_doc");
 const PM=[["cover_url","Image principale","projets"],["logo_url","Logo du client","logos"],["desktop_shot","Capture ordinateur","projets"],["mobile_shot","Capture mobile","projets"]];
 const AC=[["color_bg","Fond ivoire","#F7F6F2"],["color_ink","Texte principal","#20232B"],["color_blue","Bleu électrique","#4965FF"],["color_deep","Bleu profond","#243B9B"],["color_lav","Lavande","#B8B9FF"]];
 const AI=[["logo_url","Logo du site (en-tête et pied de page)","logos"],["img_hero","Image de fond de l’accueil","fonds"],["img_vision","Image · Notre vision","sections"],["img_expertises","Image · Expertises","sections"],["img_pourquoi","Image · Pourquoi NEXORA","sections"],["img_contact","Image · Contact","sections"]];
@@ -53,7 +54,9 @@ const CK=[["contact_email","Coordonnées › Adresse e-mail"],["contact_tel","Co
 async function enter(){const{data:{session}}=await sb.auth.getSession();if(!session)return view("login");
  const{data,error}=await sb.from("admins").select("user_id").eq("user_id",session.user.id).maybeSingle();
  if(error||!data){await sb.auth.signOut();view("login");return say("Ce compte n’a pas les droits administrateur.",1)}
- view("app");go("dash")}
+ view("app");
+ const t=await sb.from("projects").select("local_doc").limit(1);HASDOC=!t.error;
+ go("dash")}
 $("#lf").onsubmit=async e=>{e.preventDefault();if(!sb)return say("config.js n’est pas renseigné (URL et clé Supabase).",1);const b=e.submitter;b.disabled=true;
  const{error}=await sb.auth.signInWithPassword({email:$("#em").value.trim(),password:$("#pw").value});b.disabled=false;
  if(error)return say("Connexion impossible : "+error.message,1);$("#pw").value="";enter()};
@@ -98,7 +101,8 @@ async function projs(){const{data,error}=await sb.from("projects").select("*").o
  $("#v").innerHTML=`<p><button data-a="new">Ajouter un projet</button></p>`+(rows.map((p,i)=>`<div class="card"><div class="row"><strong>${esc(p.name)}</strong><span class="tag">${p.status==="publie"?"Publié":"Brouillon"}</span>${p.is_concept?'<span class="tag">Concept NEXORA</span>':""}</div>
  <div class="row" style="margin-top:8px"><button class="o" data-a="edit" data-i="${i}">Modifier</button><button class="o" data-a="tog" data-i="${i}">${p.status==="publie"?"Dépublier":"Publier"}</button><button class="o" data-a="up" data-i="${i}" aria-label="Monter" ${i?"":"disabled"}>↑</button><button class="o" data-a="dn" data-i="${i}" aria-label="Descendre" ${i<rows.length-1?"":"disabled"}>↓</button><a class="b o" href="index.html?preview=1#realisations" target="_blank" rel="noopener">Aperçu</a><button class="r" data-a="del" data-i="${i}">Supprimer</button></div></div>`).join("")||'<div class="card mu">Aucune réalisation. Ajoutez votre premier projet.</div>')}
 function form(p){p=p||{is_concept:true,status:"brouillon",features:[],gallery:[]};
- $("#v").innerHTML=`<form id="pf" class="card"><h2>${p.id?"Modifier":"Ajouter"} un projet</h2>${PF.map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}">${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
+ $("#v").innerHTML=`<form id="pf" class="card"><h2>${p.id?"Modifier":"Ajouter"} un projet</h2>${pf().map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}"${k==="local_doc"?' rows="12" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:220px"':""}>${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
+ ${HASDOC?'<p class="mu">Collez ici le code HTML complet de votre création : il s’affiche dans l’aperçu de la section Réalisations, en format ordinateur comme en format mobile. Prioritaire sur l’URL et les captures.</p><div class="row"><button type="button" class="o" data-a="pvd">Aperçu ordinateur</button><button type="button" class="o" data-a="pvm">Aperçu mobile</button><button type="button" class="o" data-a="pvx">Masquer</button></div><div id="lp"></div>':'<p class="mu">Aperçu local indisponible : la colonne <code>local_doc</code> n’existe pas encore dans la table <code>projects</code>. Exécutez le script SQL fourni, puis rechargez cette page.</p>'}
  ${PM.map(([k,l,f])=>mf(k,l,p[k]||"",f)).join("")}${mf("video_url","Vidéo de présentation (facultatif)",p.video_url||"","videos",1)}
  <label>Galerie de photos</label><div class="th" id="gl"></div><div class="row"><button type="button" class="o" data-a="ga">Importer des photos</button><button type="button" class="o" data-a="gp">Depuis la bibliothèque</button></div>
  <label><input type="checkbox" name="is_concept" ${p.is_concept?"checked":""}> Concept NEXORA (non livré à un client)</label>
@@ -107,7 +111,7 @@ function form(p){p=p||{is_concept:true,status:"brouillon",features:[],gallery:[]
  const F=$("#pf");F._p=p;F._g=[...(p.gallery||[])];gal(F)}
 const gal=F=>$("#gl").innerHTML=F._g.map((u,i)=>`<span><img class="t" src="${esc(u)}" alt=""><br><button type="button" class="o" data-a="rg" data-k="${i}">Retirer</button></span>`).join("");
 async function save(F){const p=F._p,fd=new FormData(F),s=$("#fs"),b=F.querySelector("[type=submit]");b.disabled=true;
- try{const o={};for(const[k,,t]of PF){const v=(fd.get(k)||"").trim();o[k]=k==="features"?v.split("\n").map(x=>x.trim()).filter(Boolean):(v||null)}
+ try{const o={};for(const[k,,t]of pf()){const v=(fd.get(k)||"").trim();o[k]=k==="features"?v.split("\n").map(x=>x.trim()).filter(Boolean):(v||null)}
   if(!o.name)throw new Error("Le nom du projet est obligatoire.");if(o.site_url&&!/^https?:\/\//.test(o.site_url))throw new Error("L’adresse du site doit commencer par https://");
   for(const[k]of[...PM,["video_url"]])o[k]=fd.get(k)||null;o.gallery=F._g;o.is_concept=F.is_concept.checked;o.status=fd.get("status");s.textContent="Enregistrement…";let r;
   if(p.id)r=await sb.from("projects").update(o).eq("id",p.id);else{o.position=rows.length?Math.max(...rows.map(x=>x.position))+1:0;r=await sb.from("projects").insert(o)}
@@ -154,6 +158,12 @@ async function act(b){const a=b.dataset.a,p=rows[+b.dataset.i],F=$("#pf");
  else if(a==="mfi"){const d=b.closest(".mf"),f=await fi(d.dataset.v==="1"?"video/*":"image/*");const[u]=await upl(f.slice(0,1),d.dataset.f);if(u)mfSet(d,u)}
  else if(a==="mfp"){const d=b.closest(".mf"),u=await pick(d.dataset.v==="1");if(u)mfSet(d,u)}
  else if(a==="mfc")mfSet(b.closest(".mf"),"");
+ else if(a==="pvx")$("#lp").innerHTML="";
+ else if(a==="pvd"||a==="pvm"){const m=a==="pvm",code=(F&&F.local_doc?F.local_doc.value:"").trim(),box=$("#lp");
+  if(!code){box.innerHTML='<p class="mu">Rien à prévisualiser : le champ est vide.</p>';return}
+  const W=m?390:1440,H=m?844:900,k=Math.min(1,Math.max(120,box.clientWidth||680)/W);
+  box.innerHTML=`<p class="mu">Format ${m?"mobile (390 px)":"ordinateur (1440 px)"} — rendu à ${Math.round(k*100)} %</p><div style="height:${Math.round(H*k)}px;overflow:hidden;border:1px solid #20232b26;border-radius:12px;background:#fff"><iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Aperçu local" style="width:${W}px;height:${H}px;border:0;transform:scale(${k});transform-origin:0 0;background:#fff"></iframe></div>`;
+  box.querySelector("iframe").srcdoc=code}
  else if(a==="creset"){$("#af").querySelectorAll("input[type=color]").forEach((i,k)=>i.value=AC[k][2]);$("#af")._reset=1;say("Couleurs d’origine rétablies : enregistrez le brouillon.")}
  else if(a==="go"){const f=$("#fiu").files;if(f.length){await upl(f,$("#fo").value);lib()}}
  else if(a==="mrep"){const[f]=await fi("image/*,video/*");if(f){await upl([f],"",b.dataset.p);say("Média remplacé (le changement peut mettre quelques minutes à apparaître).");lib()}}
@@ -175,4 +185,6 @@ V.addEventListener("submit",async e=>{e.preventDefault();const F=e.target;
 if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY||!window.supabase){view("login");say("config.js n’est pas renseigné : ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.",1)}
 else{sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);enter()}
 </script></body></html>
+
+
 
