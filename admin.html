@@ -31,7 +31,7 @@ dialog{width:min(760px,94vw);max-height:86vh;border:0;border-radius:16px;padding
 <p><button type="submit">Se connecter</button></p></form></div></section>
 <section id="app" hidden>
 <div class="top"><h1>Administration</h1><div class="row"><a class="b o" href="index.html?preview=1" target="_blank" rel="noopener">Prévisualiser</a><button id="pub" type="button">Publier le site</button><button class="o" id="out" type="button">Déconnexion</button></div></div>
-<nav id="tabs"><button data-t="dash">Tableau de bord</button><button data-t="projs">Réalisations</button><button data-t="lib">Médias</button><button data-t="txt">Textes</button><button data-t="look">Apparence</button><button data-t="leads">Demandes</button></nav>
+<nav id="tabs"><button data-t="dash">Tableau de bord</button><button data-t="projs">Réalisations</button><button data-t="lib">Médias</button><button data-t="txt">Textes</button><button data-t="price">Tarifs</button><button data-t="look">Apparence</button><button data-t="leads">Demandes</button></nav>
 <div id="v"></div></section></main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
@@ -62,7 +62,7 @@ $("#lf").onsubmit=async e=>{e.preventDefault();if(!sb)return say("config.js n’
  if(error)return say("Connexion impossible : "+error.message,1);$("#pw").value="";enter()};
 $("#out").onclick=async()=>{await sb.auth.signOut();view("login")};
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-t]");if(b)go(b.dataset.t)};
-function go(t){document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.t===t));({dash,projs,lib,txt,look,leads})[t]().catch(e=>say("Erreur : "+e.message,1))}
+function go(t){document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.t===t));({dash,projs,lib,txt,price,look,leads})[t]().catch(e=>say("Erreur : "+e.message,1))}
 
 /* ===== Import avec progression ===== */
 const chkF=f=>{const i=f.type.startsWith("image/"),v=f.type.startsWith("video/");if(!i&&!v)return"format non pris en charge (images JPEG, PNG, WebP, GIF, SVG ou vidéos MP4, WebM)";if(i&&f.size>10485760)return"image supérieure à 10 Mo";if(v&&f.size>52428800)return"vidéo supérieure à 50 Mo";return""};
@@ -188,10 +188,33 @@ V.addEventListener("change",async e=>{const t=e.target;
  if(t.id==="fiu"){$("#pv2").innerHTML=[...t.files].map(f=>`<div class="mc">${f.type.startsWith("image/")?`<img src="${URL.createObjectURL(f)}" alt="">`:'<div class="vi">Vidéo</div>'}<p>${esc(f.name)}<br><span class="mu">${chkF(f)||Math.round(f.size/1024)+" Ko"}</span></p></div>`).join("");$("#go").disabled=!t.files.length;return}
  const s=t.closest("[data-s]");if(!s)return;const l=rows[+s.dataset.s],{error}=await sb.from("leads").update({status:s.value}).eq("id",l.id);say(error?"Échec : "+error.message:"Statut mis à jour.",!!error);if(!error)l.status=s.value});
 V.addEventListener("submit",async e=>{e.preventDefault();const F=e.target;
- try{if(F.id==="pf")return save(F);
+ try{if(F.id==="pf")return save(F);if(F.id==="prf")return prSave().catch(x=>say("Échec : "+x.message,1));
   if(F.id==="tf"){const o={};new FormData(F).forEach((v,k)=>{v=v.trim();if(/^(social_|legal_|privacy_)/.test(k)&&v&&!/^https:\/\//.test(v))throw new Error("Les adresses doivent commencer par https://");o[k]=v});return kvSave(o)}
   if(F.id==="af"){const o={};new FormData(F).forEach((v,k)=>o[k]=v);if(F._reset)AC.forEach(([k])=>o[k]="");return kvSave(o)}}
  catch(x){say("Échec : "+x.message,1)}});
+/* ===== Tarifs (clé pricing_json : brouillon puis publication, comme les textes) ===== */
+const PRICE_DEF={plans:[{name:"Site vitrine",features:["Design sur mesure","Responsive","Bases SEO"],cta:"Demander un devis"},{name:"Site e-commerce",features:["À renseigner dans l’administration"],cta:"Demander un devis",featured:true},{name:"Application web",features:["À renseigner dans l’administration"],cta:"Demander un devis"}],options:[]};
+const PD=[["name","Nom de la formule","text"],["tag","Badge (ex. Recommandé) — facultatif","text"],["desc","Description courte — facultatif","text"],["prefix","Avant le prix (ex. À partir de)","text"],["price","Prix (ex. 990) — vide = « Sur devis »","text"],["suffix","Après le prix (ex. € HT)","text"],["features","Options incluses (une par ligne)","a"],["cta","Texte du bouton","text"]];
+const OD=[["name","Nom de l’option","text"],["desc","Description — facultatif","text"],["price","Prix (ex. + 150 €)","text"]];
+let PR={plans:[],options:[]};
+const prF=(g,i,[k,l,t],v)=>`<label>${l}${t==="a"?`<textarea data-g="${g}" data-i="${i}" data-k="${k}" rows="5">${esc(v)}</textarea>`:`<input data-g="${g}" data-i="${i}" data-k="${k}" value="${esc(v)}">`}</label>`;
+const prB=(g,i,n)=>`<p class="row"><button type="button" class="o" data-pa="up" data-g="${g}" data-i="${i}" aria-label="Monter" ${i?"":"disabled"}>↑</button><button type="button" class="o" data-pa="dn" data-g="${g}" data-i="${i}" aria-label="Descendre" ${i<n-1?"":"disabled"}>↓</button><button type="button" class="r" data-pa="del" data-g="${g}" data-i="${i}">Supprimer</button></p>`;
+function prDraw(){$("#v").innerHTML=`<form id="prf"><p class="mu">Les prix sont du texte libre : écrivez-les comme ils doivent s’afficher. Une formule ou une option sans nom n’est pas affichée. Les titres et textes de la section se modifient dans l’onglet Textes (groupe « Tarifs »).</p>
+ <h2>Formules</h2><p><button type="button" class="o" data-pa="addp">Ajouter une formule</button></p>
+ ${PR.plans.map((p,i)=>`<details class="card" ${p.name?"":"open"}><summary>${esc(p.name||"Nouvelle formule")}${p.featured?' <span class="tag">Mise en avant</span>':""}</summary>${PD.map(f=>prF("plans",i,f,f[0]==="features"?(p.features||[]).join("\n"):p[f[0]])).join("")}<label><input type="checkbox" data-g="plans" data-i="${i}" data-k="featured" ${p.featured?"checked":""}> Mettre cette formule en avant</label>${prB("plans",i,PR.plans.length)}</details>`).join("")||'<div class="card mu">Aucune formule.</div>'}
+ <h2>Options complémentaires</h2><p><button type="button" class="o" data-pa="addo">Ajouter une option</button></p>
+ ${PR.options.map((o,i)=>`<details class="card" ${o.name?"":"open"}><summary>${esc(o.name||"Nouvelle option")}</summary>${OD.map(f=>prF("options",i,f,o[f[0]])).join("")}${prB("options",i,PR.options.length)}</details>`).join("")||'<div class="card mu">Aucune option.</div>'}
+ <p><button type="submit">Enregistrer le brouillon</button></p></form>`}
+function prRead(){document.querySelectorAll("#prf [data-k]").forEach(el=>{const k=el.dataset.k,o=PR[el.dataset.g][+el.dataset.i];o[k]=el.type==="checkbox"?el.checked:k==="features"?el.value.split("\n").map(x=>x.trim()).filter(Boolean):el.value.trim()})}
+async function price(){const m=await kvLoad();let d=null;try{d=JSON.parse(m.pricing_json)}catch(_){}
+ PR=d&&Array.isArray(d.plans)?{plans:d.plans,options:Array.isArray(d.options)?d.options:[]}:JSON.parse(JSON.stringify(PRICE_DEF));prDraw()}
+async function prSave(){prRead();PR={plans:PR.plans.filter(p=>p.name),options:PR.options.filter(o=>o.name)};await kvSave({pricing_json:JSON.stringify(PR)});prDraw()}
+V.addEventListener("click",e=>{const b=e.target.closest("[data-pa]");if(!b||!$("#prf"))return;prRead();const a=b.dataset.pa,L=PR[b.dataset.g],i=+b.dataset.i;
+ if(a==="addp")PR.plans.push({name:"",features:[],cta:"Demander un devis"});else if(a==="addo")PR.options.push({name:""});
+ else if(a==="del"){if(!confirm("Supprimer cet élément ?"))return;L.splice(i,1)}
+ else{const j=a==="up"?i-1:i+1;[L[i],L[j]]=[L[j],L[i]]}
+ prDraw()});
+
 if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY||!window.supabase){view("login");say("config.js n’est pas renseigné : ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.",1)}
 else{sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);enter()}
 </script></body></html>
