@@ -1,1 +1,178 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Administration · NEXORA STUDIO</title>
+<style>
+:root{--iv:#F7F6F2;--bl:#4965FF;--bp:#243B9B;--lv:#B8B9FF;--an:#20232B;--gr:#5F6371}
+*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:radial-gradient(900px 500px at 90% -10%,#b8b9ff66,transparent),var(--iv);color:var(--an);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2{margin:0 0 .5em;letter-spacing:-.02em}.wrap{max-width:980px;margin:auto;padding:16px}
+.card{background:#ffffffc0;backdrop-filter:blur(10px);border:1px solid #20232b1a;border-radius:16px;padding:16px;margin:0 0 12px}
+label{display:block;font-size:.85rem;color:var(--gr);margin:10px 0 0}
+input,select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid #20232b33;border-radius:10px;background:#fff;color:var(--an)}textarea{min-height:70px}input[type=checkbox]{width:auto}input[type=color]{height:44px;padding:3px}
+button,.b{font:inherit;cursor:pointer;border:0;border-radius:999px;padding:10px 18px;background:var(--bl);color:#fff;text-decoration:none;display:inline-block}
+button.o,.b.o{background:transparent;color:var(--bp);border:1px solid var(--bp)}button.r{background:#b3261e}button:disabled{opacity:.5}
+:focus-visible{outline:3px solid var(--lv);outline-offset:2px}
+nav{display:flex;gap:8px;overflow-x:auto;padding:12px 0}nav button{background:#fff;color:var(--an);border:1px solid #20232b1a;white-space:nowrap}nav button[aria-current=true]{background:var(--bp);color:#fff}
+.top,.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.top{justify-content:space-between}.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.big{font-size:2.4rem;font-weight:700;color:var(--bl);line-height:1}.mu{color:var(--gr);font-size:.9rem}.tag{font-size:.75rem;padding:2px 10px;border-radius:99px;background:var(--lv);color:var(--bp)}
+#msg{position:fixed;left:12px;right:12px;bottom:12px;z-index:50;padding:12px 16px;border-radius:12px;color:#fff;max-width:600px;margin:auto}#msg.ok{background:var(--bp)}#msg.bad{background:#b3261e}
+img.t{height:64px;border-radius:8px;object-fit:cover;background:#fff}.th{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}summary{cursor:pointer;font-weight:600}
+.lg2{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px}.mc{background:#fff;border:1px solid #20232b1a;border-radius:12px;padding:8px}
+.mc img,.mc .vi{width:100%;height:90px;object-fit:cover;border-radius:8px;background:#eef;display:grid;place-items:center}.mc p{font-size:.75rem;word-break:break-all;margin:4px 0}.mc button{padding:6px 12px;font-size:.8rem}
+#pg{position:fixed;right:12px;top:12px;z-index:60;width:min(320px,calc(100% - 24px));background:#fff;border-radius:12px;padding:8px;box-shadow:0 10px 40px #0003}
+.pr{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:.8rem;margin:4px 0}.pr progress{grid-column:1/-1;width:100%}.pr.bad{color:#b3261e}
+dialog{width:min(760px,94vw);max-height:86vh;border:0;border-radius:16px;padding:16px}dialog::backdrop{background:#20232b88}
+</style></head><body>
+<div id="msg" role="status" hidden></div><div id="pg" hidden></div>
+<dialog id="dlg"><div class="top"><h2>Bibliothèque</h2><button class="o" type="button" id="dx">Fermer</button></div><input id="dq" type="search" placeholder="Rechercher un média" aria-label="Rechercher"><div class="lg2" id="dg"></div></dialog>
+<main class="wrap">
+<section id="login" hidden><div class="card" style="max-width:420px;margin:12vh auto 0"><h1>NEXORA STUDIO</h1><p class="mu">Espace administrateur</p>
+<form id="lf"><label for="em">Adresse e-mail</label><input id="em" type="email" autocomplete="username" required>
+<label for="pw">Mot de passe</label><input id="pw" type="password" autocomplete="current-password" required>
+<p><button type="submit">Se connecter</button></p></form></div></section>
+<section id="app" hidden>
+<div class="top"><h1>Administration</h1><div class="row"><a class="b o" href="index.html?preview=1" target="_blank" rel="noopener">Prévisualiser</a><button id="pub" type="button">Publier le site</button><button class="o" id="out" type="button">Déconnexion</button></div></div>
+<nav id="tabs"><button data-t="dash">Tableau de bord</button><button data-t="projs">Réalisations</button><button data-t="lib">Médias</button><button data-t="txt">Textes</button><button data-t="look">Apparence</button><button data-t="leads">Demandes</button></nav>
+<div id="v"></div></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const C=window.NEXORA_CONFIG||{};let sb,rows=[],LIB=[];
+const say=(t,bad)=>{const n=$("#msg");n.textContent=t;n.className=bad?"bad":"ok";n.hidden=false;clearTimeout(say.t);say.t=setTimeout(()=>n.hidden=true,6000)};
+const view=v=>{$("#login").hidden=v!=="login";$("#app").hidden=v!=="app"};
+const fmt=d=>d?new Date(d).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"}):"";
+const ST={nouveau:"Nouveau",en_cours:"En cours",repondu:"Répondu",termine:"Terminé"},FD=["logos","fonds","sections","projets","galerie","videos","divers"];
+const PF=[["name","Nom du projet","text"],["client_name","Nom du client","text"],["sector","Secteur d’activité","text"],["category","Catégorie","text"],["completed_on","Date de réalisation","date"],["description","Description","a"],["problem","Problématique du client","a"],["intervention","Notre intervention","a"],["features","Fonctionnalités (une par ligne)","a"],["site_url","URL du site réalisé","url"]];
+const PM=[["cover_url","Image principale","projets"],["logo_url","Logo du client","logos"],["desktop_shot","Capture ordinateur","projets"],["mobile_shot","Capture mobile","projets"]];
+const AC=[["color_bg","Fond ivoire","#F7F6F2"],["color_ink","Texte principal","#20232B"],["color_blue","Bleu électrique","#4965FF"],["color_deep","Bleu profond","#243B9B"],["color_lav","Lavande","#B8B9FF"]];
+const AI=[["logo_url","Logo du site (en-tête et pied de page)","logos"],["img_hero","Image de fond de l’accueil","fonds"],["img_vision","Image · Notre vision","sections"],["img_expertises","Image · Expertises","sections"],["img_pourquoi","Image · Pourquoi NEXORA","sections"],["img_contact","Image · Contact","sections"]];
+const CK=[["contact_email","Coordonnées › Adresse e-mail"],["contact_tel","Coordonnées › Téléphone"],["contact_address","Coordonnées › Adresse postale"],["social_instagram","Réseaux sociaux › Instagram (URL https)"],["social_linkedin","Réseaux sociaux › LinkedIn (URL https)"],["social_facebook","Réseaux sociaux › Facebook (URL https)"],["legal_url","Pied de page › Lien Mentions légales (URL https)"],["privacy_url","Pied de page › Lien Confidentialité (URL https)"]];
+
+/* ===== Session ===== */
+async function enter(){const{data:{session}}=await sb.auth.getSession();if(!session)return view("login");
+ const{data,error}=await sb.from("admins").select("user_id").eq("user_id",session.user.id).maybeSingle();
+ if(error||!data){await sb.auth.signOut();view("login");return say("Ce compte n’a pas les droits administrateur.",1)}
+ view("app");go("dash")}
+$("#lf").onsubmit=async e=>{e.preventDefault();if(!sb)return say("config.js n’est pas renseigné (URL et clé Supabase).",1);const b=e.submitter;b.disabled=true;
+ const{error}=await sb.auth.signInWithPassword({email:$("#em").value.trim(),password:$("#pw").value});b.disabled=false;
+ if(error)return say("Connexion impossible : "+error.message,1);$("#pw").value="";enter()};
+$("#out").onclick=async()=>{await sb.auth.signOut();view("login")};
+$("#tabs").onclick=e=>{const b=e.target.closest("[data-t]");if(b)go(b.dataset.t)};
+function go(t){document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.t===t));({dash,projs,lib,txt,look,leads})[t]().catch(e=>say("Erreur : "+e.message,1))}
+
+/* ===== Import avec progression ===== */
+const chkF=f=>{const i=f.type.startsWith("image/"),v=f.type.startsWith("video/");if(!i&&!v)return"format non pris en charge (images JPEG, PNG, WebP, GIF, SVG ou vidéos MP4, WebM)";if(i&&f.size>10485760)return"image supérieure à 10 Mo";if(v&&f.size>52428800)return"vidéo supérieure à 50 Mo";return""};
+function xup(file,path,up,fn){return new Promise(async(ok,ko)=>{const{data:{session}}=await sb.auth.getSession();if(!session)return ko(new Error("session expirée, reconnectez-vous"));
+ const x=new XMLHttpRequest();x.open("POST",`${C.SUPABASE_URL}/storage/v1/object/site-assets/${path.split("/").map(encodeURIComponent).join("/")}`);
+ x.setRequestHeader("apikey",C.SUPABASE_ANON_KEY);x.setRequestHeader("Authorization","Bearer "+session.access_token);x.setRequestHeader("x-upsert",up?"true":"false");x.setRequestHeader("cache-control","max-age=300");x.setRequestHeader("Content-Type",file.type);
+ x.upload.onprogress=e=>e.lengthComputable&&fn(e.loaded/e.total);
+ x.onload=()=>{if(x.status<300)ok();else{let m="";try{m=JSON.parse(x.responseText).message}catch(_){}ko(new Error(m||"erreur "+x.status))}};x.onerror=()=>ko(new Error("réseau indisponible"));x.send(file)})}
+async function upl(files,folder,rep){const box=$("#pg");box.innerHTML="";box.hidden=false;
+ const res=await Promise.all([...files].map(async f=>{const r=document.createElement("div");r.className="pr";r.innerHTML=`<span>${esc(f.name)}</span><em></em><progress max="1" value="0"></progress>`;box.append(r);const pg=r.querySelector("progress"),em=r.querySelector("em");
+  try{const e=chkF(f);if(e)throw new Error(e);const p=rep||folder+"/"+Date.now().toString(36)+"-"+f.name.toLowerCase().replace(/[^a-z0-9.]+/g,"-").slice(-60);
+   await xup(f,p,!!rep,v=>pg.value=v);pg.value=1;em.textContent="✓";return sb.storage.from("site-assets").getPublicUrl(p).data.publicUrl}
+  catch(x){em.textContent="Échec";r.classList.add("bad");r.firstChild.textContent+=" : "+x.message;return null}}));
+ setTimeout(()=>{box.querySelectorAll(".pr:not(.bad)").forEach(r=>r.remove());if(!box.children.length)box.hidden=true},2500);return res}
+const fi=(acc,multi)=>new Promise(r=>{const i=document.createElement("input");i.type="file";i.accept=acc;i.multiple=!!multi;i.onchange=()=>r([...i.files]);i.click()});
+
+/* ===== Bibliothèque ===== */
+async function loadLib(){const r=await Promise.all(FD.map(f=>sb.storage.from("site-assets").list(f,{limit:200,sortBy:{column:"created_at",order:"desc"}})));
+ const e=r.find(x=>x.error);if(e)throw e.error;
+ LIB=r.flatMap((x,i)=>x.data.filter(o=>o.id).map(o=>({folder:FD[i],path:FD[i]+"/"+o.name,name:o.name.replace(/^[a-z0-9]+-/,""),size:o.metadata?.size,type:o.metadata?.mimetype||"",url:sb.storage.from("site-assets").getPublicUrl(FD[i]+"/"+o.name).data.publicUrl})))}
+const isV=m=>m.type.startsWith("video");
+const mc=(m,pk)=>`<div class="mc">${isV(m)?'<div class="vi">Vidéo</div>':`<img src="${esc(m.url)}" alt="" loading="lazy">`}<p>${esc(m.name)}<br><span class="mu">${esc(m.folder)}${m.size?" · "+Math.round(m.size/1024)+" Ko":""}</span></p>${pk?`<button type="button" data-pk="${esc(m.url)}">Choisir</button>`:`<div class="row"><button class="o" data-a="mrep" data-p="${esc(m.path)}">Remplacer</button><button class="r" data-a="mdel" data-p="${esc(m.path)}">Supprimer</button></div>`}</div>`;
+async function lib(){await loadLib();
+ $("#v").innerHTML=`<div class="card"><h2>Importer des médias</h2><label>Dossier<select id="fo">${FD.map(f=>`<option>${f}</option>`).join("")}</select></label><label>Fichiers (sélection multiple)<input id="fiu" type="file" multiple accept="image/*,video/*"></label><div class="lg2" id="pv2"></div><p><button data-a="go" id="go" disabled>Importer</button></p></div>
+ <div class="card"><h2>Bibliothèque (${LIB.length})</h2><div class="row"><input id="q" type="search" placeholder="Rechercher un média" aria-label="Rechercher" style="flex:1"><select id="ff" style="width:auto"><option value="">Tous les dossiers</option>${FD.map(f=>`<option>${f}</option>`).join("")}</select></div><div class="lg2" id="lb"></div></div>`;drawLib()}
+function drawLib(){const q=($("#q").value||"").toLowerCase(),f=$("#ff").value;$("#lb").innerHTML=LIB.filter(m=>(!f||m.folder===f)&&m.name.includes(q)).map(m=>mc(m)).join("")||'<p class="mu">Aucun média.</p>'}
+function pick(vid){return new Promise(async res=>{const d=$("#dlg");if(!LIB.length)await loadLib();let q="";
+ const draw=()=>{$("#dg").innerHTML=LIB.filter(m=>(vid?isV(m):!isV(m))&&m.name.includes(q)).map(m=>mc(m,1)).join("")||'<p class="mu">Aucun média. Importez-en dans l’onglet Médias.</p>'};
+ $("#dq").value="";$("#dq").oninput=e=>{q=e.target.value.toLowerCase();draw()};draw();d.returnValue="";
+ d.onclick=e=>{const b=e.target.closest("[data-pk]");if(b)d.close(b.dataset.pk);else if(e.target===d||e.target.id==="dx")d.close("")};d.onclose=()=>res(d.returnValue||null);d.showModal()})}
+const mf=(n,l,v,f,vid)=>`<div class="mf" data-n="${n}" data-l="${esc(l)}" data-f="${f}" data-v="${vid?1:0}"><label>${l}</label><input type="hidden" name="${n}" value="${esc(v)}"><div class="th">${v?(vid?'<span class="tag">Vidéo choisie</span>':`<img class="t" src="${esc(v)}" alt="">`):""}</div><div class="row"><button type="button" class="o" data-a="mfi">Importer</button><button type="button" class="o" data-a="mfp">Bibliothèque</button>${v?'<button type="button" class="o" data-a="mfc">Retirer</button>':""}</div></div>`;
+const mfSet=(d,u)=>{d.outerHTML=mf(d.dataset.n,d.dataset.l,u,d.dataset.f,d.dataset.v==="1")};
+
+/* ===== Réalisations ===== */
+async function projs(){const{data,error}=await sb.from("projects").select("*").order("position").order("created_at");if(error)throw error;rows=data;
+ $("#v").innerHTML=`<p><button data-a="new">Ajouter un projet</button></p>`+(rows.map((p,i)=>`<div class="card"><div class="row"><strong>${esc(p.name)}</strong><span class="tag">${p.status==="publie"?"Publié":"Brouillon"}</span>${p.is_concept?'<span class="tag">Concept NEXORA</span>':""}</div>
+ <div class="row" style="margin-top:8px"><button class="o" data-a="edit" data-i="${i}">Modifier</button><button class="o" data-a="tog" data-i="${i}">${p.status==="publie"?"Dépublier":"Publier"}</button><button class="o" data-a="up" data-i="${i}" aria-label="Monter" ${i?"":"disabled"}>↑</button><button class="o" data-a="dn" data-i="${i}" aria-label="Descendre" ${i<rows.length-1?"":"disabled"}>↓</button><a class="b o" href="index.html?preview=1#realisations" target="_blank" rel="noopener">Aperçu</a><button class="r" data-a="del" data-i="${i}">Supprimer</button></div></div>`).join("")||'<div class="card mu">Aucune réalisation. Ajoutez votre premier projet.</div>')}
+function form(p){p=p||{is_concept:true,status:"brouillon",features:[],gallery:[]};
+ $("#v").innerHTML=`<form id="pf" class="card"><h2>${p.id?"Modifier":"Ajouter"} un projet</h2>${PF.map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}">${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
+ ${PM.map(([k,l,f])=>mf(k,l,p[k]||"",f)).join("")}${mf("video_url","Vidéo de présentation (facultatif)",p.video_url||"","videos",1)}
+ <label>Galerie de photos</label><div class="th" id="gl"></div><div class="row"><button type="button" class="o" data-a="ga">Importer des photos</button><button type="button" class="o" data-a="gp">Depuis la bibliothèque</button></div>
+ <label><input type="checkbox" name="is_concept" ${p.is_concept?"checked":""}> Concept NEXORA (non livré à un client)</label>
+ <label>Statut<select name="status"><option value="brouillon" ${p.status==="brouillon"?"selected":""}>Brouillon</option><option value="publie" ${p.status==="publie"?"selected":""}>Publié</option></select></label>
+ <p class="row"><button type="submit">Enregistrer</button><button type="button" class="o" data-a="back">Annuler</button></p><p id="fs" class="mu" role="status"></p></form>`;
+ const F=$("#pf");F._p=p;F._g=[...(p.gallery||[])];gal(F)}
+const gal=F=>$("#gl").innerHTML=F._g.map((u,i)=>`<span><img class="t" src="${esc(u)}" alt=""><br><button type="button" class="o" data-a="rg" data-k="${i}">Retirer</button></span>`).join("");
+async function save(F){const p=F._p,fd=new FormData(F),s=$("#fs"),b=F.querySelector("[type=submit]");b.disabled=true;
+ try{const o={};for(const[k,,t]of PF){const v=(fd.get(k)||"").trim();o[k]=k==="features"?v.split("\n").map(x=>x.trim()).filter(Boolean):(v||null)}
+  if(!o.name)throw new Error("Le nom du projet est obligatoire.");if(o.site_url&&!/^https?:\/\//.test(o.site_url))throw new Error("L’adresse du site doit commencer par https://");
+  for(const[k]of[...PM,["video_url"]])o[k]=fd.get(k)||null;o.gallery=F._g;o.is_concept=F.is_concept.checked;o.status=fd.get("status");s.textContent="Enregistrement…";let r;
+  if(p.id)r=await sb.from("projects").update(o).eq("id",p.id);else{o.position=rows.length?Math.max(...rows.map(x=>x.position))+1:0;r=await sb.from("projects").insert(o)}
+  if(r.error)throw r.error;say("Projet enregistré.");projs()}catch(e){s.textContent="Échec : "+e.message;say("Échec : "+e.message,1);b.disabled=false}}
+const swap=async(i,j)=>{const a=rows[i],b=rows[j],r=await Promise.all([sb.from("projects").update({position:j}).eq("id",a.id),sb.from("projects").update({position:i}).eq("id",b.id)]);const e=r.find(x=>x.error);if(e)throw e.error;projs()};
+
+/* ===== Textes, apparence, brouillon / publication ===== */
+async function kvLoad(){const[a,b]=await Promise.all([sb.from("site_content").select("key,value"),sb.from("site_drafts").select("key,value")]);const e=a.error||b.error;if(e)throw e;const m={};a.data.forEach(r=>m[r.key]=r.value);b.data.forEach(r=>m[r.key]=r.value);return m}
+async function kvSave(o){const r=await sb.from("site_drafts").upsert(Object.entries(o).map(([key,value])=>({key,value})));if(r.error)throw r.error;say("Brouillon enregistré. Prévisualisez, puis publiez le site.")}
+$("#pub").onclick=async()=>{if(!confirm("Publier tous les brouillons sur le site public ?"))return;const{data,error}=await sb.from("site_drafts").select("key,value");if(error)return say("Échec : "+error.message,1);
+ if(!data.length)return say("Aucun brouillon à publier.");const r=await sb.from("site_content").upsert(data);say(r.error?"Échec : "+r.error.message:"Site publié.",!!r.error)};
+async function txt(){const[h,m]=await Promise.all([fetch("index.html",{cache:"no-store"}).then(r=>r.ok?r.text():null).catch(()=>null),kvLoad()]);
+ if(!h)return $("#v").innerHTML='<div class="card">Impossible de lire index.html : ouvrez l’administration depuis votre site en ligne (GitHub Pages), pas depuis un fichier local.</div>';
+ const d=new DOMParser().parseFromString(h,"text/html"),seen={},it=[];
+ d.querySelectorAll("[data-c]").forEach(el=>{const k=el.dataset.c;if(seen[k])return;seen[k]=1;const t=document.createElement("div");t.innerHTML=el.innerHTML.replace(/<br\s*\/?>/gi,"\n");it.push([k,el.dataset.l||k,t.textContent.trim()])});
+ CK.forEach(([k,l])=>it.push([k,l,""]));const G={};it.forEach(x=>{const[g,n]=x[1].split(" › ");(G[g]=G[g]||[]).push([x[0],n||g,x[2]])});
+ $("#v").innerHTML=`<form id="tf"><p class="mu">Un champ vide affiche le texte par défaut du site.</p>${Object.entries(G).map(([g,a])=>`<details class="card"><summary>${esc(g)}</summary>${a.map(([k,n,df])=>`<label>${esc(n)}<textarea name="${k}" rows="${df.length>90?4:2}" placeholder="${esc(df)}">${esc(m[k])}</textarea></label>`).join("")}</details>`).join("")}<p><button type="submit">Enregistrer le brouillon</button></p></form>`}
+async function look(){const m=await kvLoad();
+ $("#v").innerHTML=`<form id="af" class="card"><h2>Apparence</h2>${AC.map(([k,l,df])=>`<label>${l}<input type="color" name="${k}" value="${/^#[0-9a-f]{6}$/i.test(m[k]||"")?m[k]:df}"></label>`).join("")}<p><button type="button" class="o" data-a="creset">Rétablir les couleurs d’origine</button></p>${AI.map(([k,l,f])=>mf(k,l,m[k]||"",f)).join("")}<p><button type="submit">Enregistrer le brouillon</button></p></form>`}
+
+/* ===== Demandes ===== */
+async function leads(){const{data,error}=await sb.from("leads").select("*").order("created_at",{ascending:false});if(error)throw error;rows=data;
+ $("#v").innerHTML=rows.map((l,i)=>`<details class="card"><summary>${esc(l.prenom)} ${esc(l.nom)} · ${esc(l.type_projet)} <span class="tag">${ST[l.status]}</span> <span class="mu">${fmt(l.created_at)}</span></summary>
+ <p><a href="mailto:${esc(l.email)}">${esc(l.email)}</a>${l.tel?` · <a href="tel:${esc(l.tel.replace(/[^\d+]/g,""))}">${esc(l.tel)}</a>`:""}${l.entreprise?" · "+esc(l.entreprise):""}</p>
+ <p><strong>Budget :</strong> ${esc(l.budget)} · <strong>Délai :</strong> ${esc(l.delai)}</p><p style="white-space:pre-wrap">${esc(l.description)}</p>
+ ${(l.files||[]).map(f=>`<button class="o" data-a="file" data-u="${esc(f)}">Télécharger ${esc(f.split("/").pop())}</button> `).join("")}
+ <p class="row"><select data-s="${i}" aria-label="Statut" style="width:auto">${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${k===l.status?"selected":""}>${v}</option>`).join("")}</select><button class="r" data-a="ldel" data-i="${i}">Supprimer</button></p></details>`).join("")||'<div class="card mu">Aucune demande reçue.</div>'}
+async function dash(){const n=(t,f)=>{let q=sb.from(t).select("id",{count:"exact",head:true});return f?f(q):q};
+ const[a,b,c,l,p]=await Promise.all([n("projects",q=>q.eq("status","publie")),n("projects",q=>q.eq("status","brouillon")),n("leads"),sb.from("leads").select("nom,prenom,type_projet,status,created_at").order("created_at",{ascending:false}).limit(5),sb.from("projects").select("name,status,created_at").order("created_at",{ascending:false}).limit(5)]);
+ const e=[a,b,c,l,p].find(x=>x.error);if(e)throw e.error;
+ $("#v").innerHTML=`<div class="g"><div class="card"><div class="big">${a.count}</div>Projets publiés</div><div class="card"><div class="big">${b.count}</div>Brouillons</div><div class="card"><div class="big">${c.count}</div>Demandes reçues</div></div>
+ <div class="card"><h2>Dernières demandes</h2>${l.data.map(x=>`<p>${esc(x.prenom)} ${esc(x.nom)} · ${esc(x.type_projet)} <span class="tag">${ST[x.status]}</span><br><span class="mu">${fmt(x.created_at)}</span></p>`).join("")||'<p class="mu">Aucune demande pour le moment.</p>'}</div>
+ <div class="card"><h2>Dernières réalisations</h2>${p.data.map(x=>`<p>${esc(x.name)} <span class="tag">${x.status==="publie"?"Publié":"Brouillon"}</span><br><span class="mu">${fmt(x.created_at)}</span></p>`).join("")||'<p class="mu">Aucune réalisation pour le moment.</p>'}</div>`}
+
+/* ===== Actions ===== */
+async function act(b){const a=b.dataset.a,p=rows[+b.dataset.i],F=$("#pf");
+ if(a==="new")form();else if(a==="edit")form(p);else if(a==="back")projs();
+ else if(a==="tog"){const{error}=await sb.from("projects").update({status:p.status==="publie"?"brouillon":"publie"}).eq("id",p.id);if(error)throw error;say(p.status==="publie"?"Projet dépublié.":"Projet publié.");projs()}
+ else if(a==="up")await swap(+b.dataset.i,+b.dataset.i-1);else if(a==="dn")await swap(+b.dataset.i,+b.dataset.i+1);
+ else if(a==="del"&&confirm("Supprimer définitivement « "+p.name+" » ? Les médias restent dans la bibliothèque.")){const{error}=await sb.from("projects").delete().eq("id",p.id);if(error)throw error;say("Projet supprimé.");projs()}
+ else if(a==="rg"){F._g.splice(+b.dataset.k,1);gal(F)}
+ else if(a==="ga"){const f=await fi("image/*",1);F._g.push(...(await upl(f,"galerie")).filter(Boolean));gal(F)}
+ else if(a==="gp"){const u=await pick();if(u){F._g.push(u);gal(F)}}
+ else if(a==="mfi"){const d=b.closest(".mf"),f=await fi(d.dataset.v==="1"?"video/*":"image/*");const[u]=await upl(f.slice(0,1),d.dataset.f);if(u)mfSet(d,u)}
+ else if(a==="mfp"){const d=b.closest(".mf"),u=await pick(d.dataset.v==="1");if(u)mfSet(d,u)}
+ else if(a==="mfc")mfSet(b.closest(".mf"),"");
+ else if(a==="creset"){$("#af").querySelectorAll("input[type=color]").forEach((i,k)=>i.value=AC[k][2]);$("#af")._reset=1;say("Couleurs d’origine rétablies : enregistrez le brouillon.")}
+ else if(a==="go"){const f=$("#fiu").files;if(f.length){await upl(f,$("#fo").value);lib()}}
+ else if(a==="mrep"){const[f]=await fi("image/*,video/*");if(f){await upl([f],"",b.dataset.p);say("Média remplacé (le changement peut mettre quelques minutes à apparaître).");lib()}}
+ else if(a==="mdel"&&confirm("Supprimer ce média ? Il disparaîtra des pages qui l’utilisent.")){const{error}=await sb.storage.from("site-assets").remove([b.dataset.p]);if(error)throw error;say("Média supprimé.");lib()}
+ else if(a==="ldel"&&confirm("Supprimer cette demande et ses pièces jointes ?")){const l=rows[+b.dataset.i];if(l.files?.length)await sb.storage.from("lead-files").remove(l.files);const{error}=await sb.from("leads").delete().eq("id",l.id);if(error)throw error;say("Demande supprimée.");leads()}
+ else if(a==="file"){const{data,error}=await sb.storage.from("lead-files").createSignedUrl(b.dataset.u,120);if(error)throw error;open(data.signedUrl,"_blank","noopener")}}
+const V=$("#v");
+V.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(b)act(b).catch(x=>say("Erreur : "+x.message,1))});
+V.addEventListener("input",e=>{if(e.target.id==="q")drawLib()});
+V.addEventListener("change",async e=>{const t=e.target;
+ if(t.id==="ff")return drawLib();
+ if(t.id==="fiu"){$("#pv2").innerHTML=[...t.files].map(f=>`<div class="mc">${f.type.startsWith("image/")?`<img src="${URL.createObjectURL(f)}" alt="">`:'<div class="vi">Vidéo</div>'}<p>${esc(f.name)}<br><span class="mu">${chkF(f)||Math.round(f.size/1024)+" Ko"}</span></p></div>`).join("");$("#go").disabled=!t.files.length;return}
+ const s=t.closest("[data-s]");if(!s)return;const l=rows[+s.dataset.s],{error}=await sb.from("leads").update({status:s.value}).eq("id",l.id);say(error?"Échec : "+error.message:"Statut mis à jour.",!!error);if(!error)l.status=s.value});
+V.addEventListener("submit",async e=>{e.preventDefault();const F=e.target;
+ try{if(F.id==="pf")return save(F);
+  if(F.id==="tf"){const o={};new FormData(F).forEach((v,k)=>{v=v.trim();if(/^(social_|legal_|privacy_)/.test(k)&&v&&!/^https:\/\//.test(v))throw new Error("Les adresses doivent commencer par https://");o[k]=v});return kvSave(o)}
+  if(F.id==="af"){const o={};new FormData(F).forEach((v,k)=>o[k]=v);if(F._reset)AC.forEach(([k])=>o[k]="");return kvSave(o)}}
+ catch(x){say("Échec : "+x.message,1)}});
+if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY||!window.supabase){view("login");say("config.js n’est pas renseigné : ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.",1)}
+else{sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);enter()}
+</script></body></html>
 
