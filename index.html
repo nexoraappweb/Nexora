@@ -264,8 +264,10 @@ header.s::before{opacity:1}
 .dev.m::before{content:"";position:absolute;z-index:7;top:19px;left:50%;width:26%;height:21px;translate:-50% 0;border-radius:99px;background:#000}
 .scr{flex:1;min-height:0;position:relative;overflow:hidden;background:#fff;transition:opacity .3s,border-radius .8s var(--e)}
 .dev.m .scr{border-radius:clamp(26px,2.7vw,40px)}
+.dev.m .scr::before{content:"";position:absolute;left:0;right:0;top:0;height:30px;z-index:2;background:#000}
+.dev.m .scr iframe{top:30px}
 .scr.f{opacity:0}
-.scr iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;background:#fff;pointer-events:none}
+.scr iframe{position:absolute;left:0;top:0;max-width:none;max-height:none;border:0;transform-origin:0 0;background:#fff;pointer-events:none}
 .act .scr iframe{pointer-events:auto}
 .pp{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;object-position:top;transition:opacity .8s var(--e)}
 .rdy .pp{opacity:0;pointer-events:none}
@@ -293,6 +295,7 @@ header.s::before{opacity:1}
 /* étude de cas sous la scène */
 .cs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:clamp(14px,2vw,26px);margin-top:clamp(8px,2vh,22px)}
 .cs>div{padding:clamp(18px,2vw,28px);border:1px solid rgba(255,255,255,.09);border-radius:clamp(18px,2vw,26px);background:rgba(255,255,255,.035);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.cs .cd{display:none}
 .cs h4{font:600 11.5px/1 var(--fb);letter-spacing:.16em;text-transform:uppercase;color:var(--bl);margin-bottom:12px}
 .cs p,.cs li{color:var(--mu)}.cs li::before{content:"+ ";color:var(--bl)}
 
@@ -309,10 +312,13 @@ header.s::before{opacity:1}
 }
 @media(max-width:1024px) and (max-height:700px){.pdesc{display:none}}
 @media(max-width:640px){
+ .pdesc{display:none}.cs .cd{display:block}
+ .sw button{min-height:38px;padding:7px 14px}
  .pc{gap:8px}.sw{flex:1 1 100%;justify-content:center}.sw button{flex:1}
  .pc .cta{flex:1 1 calc(50% - 4px);min-height:44px;padding:11px 14px}
  .px[data-k=img] .pc .cta,.px[data-k=vid] .pc .cta,.px[data-k=gal] .pc .cta{flex-basis:100%}
 }
+@media(max-width:1024px){body.nxp #tt{opacity:0!important;pointer-events:none!important}}
 @media(prefers-reduced-motion:reduce){
  .pt{height:auto!important}.ps{position:relative;height:auto;overflow:visible}
  .pd{transform:none!important;opacity:1!important;height:min(78svh,720px)}.pg{display:none}
@@ -950,6 +956,8 @@ function kindOf(p){const raw=p.shot.d||p.shot.m,s=raw||p.cover,m=p.pres;
  if(m==="import")return p.imp?"imp":"none";if(m==="url")return p.url?"url":"none";if(m==="capture")return s?"img":"none";
  return p.doc?"doc":p.imp?"imp":p.video?"vid":p.url&&!raw?"url":s?"img":p.gallery.length?"gal":"none"}
 const poster=(p,m)=>(m==="m"?p.shot.m:"")||p.shot.d||p.shot.m||p.cover;
+/* même origine que NEXORA (ex. deux sites sur *.github.io) : jamais allow-same-origin, sinon le site embarqué lirait la session de NEXORA */
+const sameOrigin=u=>{try{return new URL(u,location.href).origin===location.origin}catch(_){return true}};
 const hostOf=u=>u.replace(/^https?:\/\//,"").replace(/\/$/,"");
 
 function drawProjects(){pj.innerHTML="";const n=PROJECTS.length;
@@ -959,17 +967,17 @@ function drawProjects(){pj.innerHTML="";const n=PROJECTS.length;
   sl=p.blocked?"Aperçu en capture : ce site n’autorise pas l’intégration · Ouvrir ↗":"Le site met du temps à répondre · Ouvrir ↗";
   pj.insertAdjacentHTML("beforeend",`<article class="px${p.blocked?" slow":""}" data-i="${i}" data-k="${k}" data-mode="${m}"><div class="pt"><div class="ps"><p class="pg" aria-hidden="true">${esc(p.name)}</p>
 <div class="ph"><p class="k pn">${String(i+1).padStart(2,"0")} — ${String(n).padStart(2,"0")}</p><p class="k">${esc([p.sector,p.cat].filter(Boolean).join(" · "))}</p><h3>${esc(p.name)}</h3><p class="tg">${p.status==="concept"?"Concept NEXORA, non livré à un client":"Projet livré"}</p><p class="pdesc">${esc(p.intro)}</p></div>
-<div class="pd"><div class="dev ${m}"><div class="bar"><i></i><i></i><i></i><span class="adr">${esc(host)}</span></div><div class="scr">${ps?`<img class="pp" alt="" src="${esc(ps)}" decoding="async">`:""}${fr?`<iframe title="Aperçu : ${esc(p.name)}" sandbox="${k==="url"?"allow-scripts allow-same-origin allow-forms allow-popups":"allow-scripts allow-forms allow-popups"}" referrerpolicy="no-referrer" tabindex="-1"></iframe><i class="pl"></i><button class="shd" type="button" aria-label="Explorer le site ${esc(p.name)}"><span>Explorer le site</span></button>`:""}${k==="url"||p.blocked?`<a class="sl" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${sl}</a>`:""}<div class="fb" hidden></div></div></div><span class="pgr" aria-hidden="true"><i></i></span></div>
+<div class="pd"><div class="dev ${m}"><div class="bar"><i></i><i></i><i></i><span class="adr">${esc(host)}</span></div><div class="scr">${ps?`<img class="pp" alt="" src="${esc(ps)}" decoding="async">`:""}${fr?`<iframe title="Aperçu : ${esc(p.name)}" sandbox="${k==="url"&&!sameOrigin(p.url)?"allow-scripts allow-same-origin allow-forms allow-popups":"allow-scripts allow-forms allow-popups"}" referrerpolicy="no-referrer" tabindex="-1"></iframe><i class="pl"></i><button class="shd" type="button" aria-label="Explorer le site ${esc(p.name)}"><span>Explorer le site</span></button>`:""}${k==="url"||p.blocked?`<a class="sl" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${sl}</a>`:""}<div class="fb" hidden></div></div></div><span class="pgr" aria-hidden="true"><i></i></span></div>
 <div class="pc"><div class="sw" role="group" aria-label="Format de l’aperçu"><button type="button" data-m="d" aria-pressed="${m==="d"}">Ordinateur</button><button type="button" data-m="m" aria-pressed="${m==="m"}">Mobile</button></div>${fr?'<button class="cta o xp" type="button" aria-pressed="false">Explorer le site</button>':""}${p.url?`<a class="cta ar" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Découvrir le site</a>`:""}</div></div></div>
-${p.need||p.work||p.features.length?`<div class="cs rv">${p.need?`<div><h4>Le besoin</h4><p>${esc(p.need)}</p></div>`:""}${p.work?`<div><h4>Le travail effectué</h4><p>${esc(p.work)}</p></div>`:""}${p.features.length?`<div><h4>Fonctionnalités</h4><ul>${p.features.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></div>`:""}</div>`:""}</article>`)});
+${p.need||p.work||p.features.length?`<div class="cs rv">${p.intro?`<div class="cd"><h4>Le projet</h4><p>${esc(p.intro)}</p></div>`:""}${p.need?`<div><h4>Le besoin</h4><p>${esc(p.need)}</p></div>`:""}${p.work?`<div><h4>Le travail effectué</h4><p>${esc(p.work)}</p></div>`:""}${p.features.length?`<div><h4>Fonctionnalités</h4><ul>${p.features.map(f=>`<li>${esc(f)}</li>`).join("")}</ul></div>`:""}</div>`:""}</article>`)});
  $$(".px").forEach(a=>{fit(a);lz.observe(a);rsz.observe($(".pd",a))});watch(pj);regPx();ask();nxs()}
 
 /* Dimensionnement : le cadre épouse la scène ; le site est rendu dans un viewport virtuel réaliste puis mis à l'échelle.
    Ordinateur : 1024–1440 px selon la largeur du cadre. Mobile : largeur réelle de l'écran du téléphone (320–430 px). */
 function dims(W,H,m){
- if(m==="m"){let oh=Math.min(H,880),ow=oh*.49;if(ow>W){ow=W;oh=ow/.49}
-  const pad=10,sw=ow-2*pad,vw=nxc(Math.round(sw),320,430),k=sw/vw;return{ow,oh,k,vw,vh:(oh-2*pad)/k,sb:0}}
- let ow=W,oh=H;const A=W<640?1.15:1.35;if(ow/oh>1.9)ow=oh*1.9;else if(ow/oh<A)oh=ow/A;
+ if(m==="m"){const R=.53;let oh=Math.min(H,880),ow=oh*R;if(ow>W){ow=W;oh=ow/R}
+  const pad=10,sw=ow-2*pad,vw=nxc(Math.round(sw),320,430),k=sw/vw;return{ow,oh,k,vw,vh:(oh-2*pad-30)/k,sb:0}}
+ let ow=W,oh=H;const A=W<900?1:1.25;if(ow/oh>1.9)ow=oh*1.9;else if(ow/oh<A)oh=ow/A;
  const vw=nxc(Math.round(ow*1.25),1024,1440),k=(ow-2)/vw;return{ow,oh,k,vw,vh:(oh-34)/k,sb:SBW}}
 function fit(a){const st=$(".pd",a),W=st.clientWidth,H=st.clientHeight;if(!W||!H)return;
  const d=dims(W,H,a.dataset.mode),dv=$(".dev",a),f=$("iframe",a);
@@ -1018,14 +1026,15 @@ function sync(a,q){const p=PROJECTS[a.dataset.i];
  if(p.kind==="imp"&&a._sync){const f=$("iframe",a);f&&f.contentWindow&&f.contentWindow.postMessage({nx:1,n:NXN,t:"scroll",q},"*")}
  else if(p.kind==="img"){const s=$(".scr",a),im=$("img.sh",a);if(im&&im.offsetHeight)im.style.transform=`translate3d(0,${-(q*Math.max(0,im.offsetHeight-s.clientHeight)).toFixed(1)}px,0)`}}
 let nxk=0;
-function nxy(){nxk=0;const vh=innerHeight;
- $$(".px").forEach(a=>{const r=$(".pt",a).getBoundingClientRect();
+function nxy(){nxk=0;const vh=innerHeight;let pinned=false;
+ $$(".px").forEach(a=>{const r=$(".pt",a).getBoundingClientRect();if(r.top<=0&&r.bottom>=vh)pinned=true;
   if(r.bottom<-vh*.5||r.top>vh*1.5){if(a.classList.contains("act"))act(a,0);return}
   let p=0,en=1,ex=0;if(!RM){p=nxc(-r.top/Math.max(1,r.height-vh),0,1);en=nxc((vh-r.top)/(vh*.85),0,1);ex=nxc((p-.9)/.1,0,1)}
   const s=$(".ps",a),q=nxc((p-.06)/.84,0,1);
   if(Math.abs((a._en??-1)-en)>.002||Math.abs((a._p??-1)-p)>.002||Math.abs((a._ex??-1)-ex)>.002){a._en=en;a._p=p;a._ex=ex;s.style.setProperty("--en",en.toFixed(3));s.style.setProperty("--p",p.toFixed(3));s.style.setProperty("--ex",ex.toFixed(3))}
   a.classList.toggle("in",en>.35);
-  if(!RM&&!a.classList.contains("act")&&Math.abs((a._q??-1)-q)>.001){a._q=q;sync(a,q)}})}
+  if(!RM&&!a.classList.contains("act")&&Math.abs((a._q??-1)-q)>.001){a._q=q;sync(a,q)}});
+ document.body.classList.toggle("nxp",pinned)}
 const nxs=()=>{if(!nxk)nxk=requestAnimationFrame(nxy)};
 addEventListener("scroll",nxs,{passive:true});addEventListener("resize",nxs,{passive:true});
 
