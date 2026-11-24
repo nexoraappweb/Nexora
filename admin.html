@@ -21,6 +21,15 @@ img.t{height:64px;border-radius:8px;object-fit:cover;background:#fff}.th{display
 #pg{position:fixed;right:12px;top:12px;z-index:60;width:min(320px,calc(100% - 24px));background:#fff;border-radius:12px;padding:8px;box-shadow:0 10px 40px #0003}
 .pr{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:.8rem;margin:4px 0}.pr progress{grid-column:1/-1;width:100%}.pr.bad{color:#b3261e}
 dialog{width:min(760px,94vw);max-height:86vh;border:0;border-radius:16px;padding:16px}dialog::backdrop{background:#20232b88}
+.npd{margin:10px auto;background:#111;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 12px 36px #0003;max-width:100%}
+.npd.m{border-radius:30px;background:#16161c}
+.npb{flex:none;height:26px;background:#25252e;display:flex;align-items:center;gap:5px;padding:0 10px}.npb i{width:8px;height:8px;border-radius:50%;background:#666}.npd.m .npb{display:none}
+.ns{flex:1;position:relative;overflow:hidden;background:#fff}.npd.m .ns{border-radius:22px}
+.ns iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;background:#fff}
+.nl{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:16px;background:#fffe;font-size:.85rem}
+.sp{display:inline-block;width:14px;height:14px;border:2px solid #20232b33;border-top-color:var(--bl);border-radius:50%;animation:spn .8s linear infinite;vertical-align:-2px;margin-right:6px}@keyframes spn{to{transform:rotate(360deg)}}
+.rp{font-size:.82rem;margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff;border:1px solid #20232b1a;overflow-wrap:anywhere}.rp.bad{border-color:#b3261e;color:#b3261e}.rp.ok{border-color:#2e7d32;color:#1b5e20}
+button:disabled{cursor:not-allowed}
 </style></head><body>
 <div id="msg" role="status" hidden></div><div id="pg" hidden></div>
 <dialog id="dlg"><div class="top"><h2>Bibliothèque</h2><button class="o" type="button" id="dx">Fermer</button></div><input id="dq" type="search" placeholder="Rechercher un média" aria-label="Rechercher"><div class="lg2" id="dg"></div></dialog>
@@ -38,7 +47,7 @@ dialog{width:min(760px,94vw);max-height:86vh;border:0;border-radius:16px;padding
 <script>
 "use strict";
 const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const C=window.NEXORA_CONFIG||{};let sb,rows=[],LIB=[],HASDOC=false;
+const C=window.NEXORA_CONFIG||{};let sb,rows=[],LIB=[],HASDOC=false,HASPRES=false,HASBK=false;
 const say=(t,bad)=>{const n=$("#msg");n.textContent=t;n.className=bad?"bad":"ok";n.hidden=false;clearTimeout(say.t);say.t=setTimeout(()=>n.hidden=true,6000)};
 const view=v=>{$("#login").hidden=v!=="login";$("#app").hidden=v!=="app"};
 const fmt=d=>d?new Date(d).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"}):"";
@@ -56,19 +65,21 @@ async function enter(){const{data:{session}}=await sb.auth.getSession();if(!sess
  if(error||!data){await sb.auth.signOut();view("login");return say("Ce compte n’a pas les droits administrateur.",1)}
  view("app");
  const t=await sb.from("projects").select("local_doc").limit(1);HASDOC=!t.error;
+ const t2=await sb.from("projects").select("presentation,import_path,preview_meta").limit(1);HASPRES=!t2.error;
+ const t3=await sb.storage.from(PB).list("",{limit:1});HASBK=!t3.error;
  go("dash")}
 $("#lf").onsubmit=async e=>{e.preventDefault();if(!sb)return say("config.js n’est pas renseigné (URL et clé Supabase).",1);const b=e.submitter;b.disabled=true;
  const{error}=await sb.auth.signInWithPassword({email:$("#em").value.trim(),password:$("#pw").value});b.disabled=false;
  if(error)return say("Connexion impossible : "+error.message,1);$("#pw").value="";enter()};
 $("#out").onclick=async()=>{await sb.auth.signOut();view("login")};
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-t]");if(b)go(b.dataset.t)};
-function go(t){document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.t===t));({dash,projs,lib,txt,price,look,leads})[t]().catch(e=>say("Erreur : "+e.message,1))}
+function go(t){const PF0=$("#pf");if(PF0&&PF0._imp&&PF0._imp.pending&&!PF0._saved)dropPkg(PF0._imp.prefix);document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-current",b.dataset.t===t));({dash,projs,lib,txt,price,look,leads})[t]().catch(e=>say("Erreur : "+e.message,1))}
 
 /* ===== Import avec progression ===== */
 const chkF=f=>{const i=f.type.startsWith("image/"),v=f.type.startsWith("video/");if(!i&&!v)return"format non pris en charge (images JPEG, PNG, WebP, GIF, SVG ou vidéos MP4, WebM)";if(i&&f.size>10485760)return"image supérieure à 10 Mo";if(v&&f.size>52428800)return"vidéo supérieure à 50 Mo";return""};
-function xup(file,path,up,fn){return new Promise(async(ok,ko)=>{const{data:{session}}=await sb.auth.getSession();if(!session)return ko(new Error("session expirée, reconnectez-vous"));
- const x=new XMLHttpRequest();x.open("POST",`${C.SUPABASE_URL}/storage/v1/object/site-assets/${path.split("/").map(encodeURIComponent).join("/")}`);
- x.setRequestHeader("apikey",C.SUPABASE_ANON_KEY);x.setRequestHeader("Authorization","Bearer "+session.access_token);x.setRequestHeader("x-upsert",up?"true":"false");x.setRequestHeader("cache-control","max-age=300");x.setRequestHeader("Content-Type",file.type);
+function xup(file,path,up,fn,bk){return new Promise(async(ok,ko)=>{const{data:{session}}=await sb.auth.getSession();if(!session)return ko(new Error("session expirée, reconnectez-vous"));
+ const x=new XMLHttpRequest();x.open("POST",`${C.SUPABASE_URL}/storage/v1/object/${bk||"site-assets"}/${path.split("/").map(encodeURIComponent).join("/")}`);
+ x.setRequestHeader("apikey",C.SUPABASE_ANON_KEY);x.setRequestHeader("Authorization","Bearer "+session.access_token);x.setRequestHeader("x-upsert",up?"true":"false");x.setRequestHeader("cache-control",bk?"max-age=31536000":"max-age=300");x.setRequestHeader("Content-Type",file.type);
  x.upload.onprogress=e=>e.lengthComputable&&fn(e.loaded/e.total);
  x.onload=()=>{if(x.status<300)ok();else{let m="";try{m=JSON.parse(x.responseText).message}catch(_){}ko(new Error(m||"erreur "+x.status))}};x.onerror=()=>ko(new Error("réseau indisponible"));x.send(file)})}
 async function upl(files,folder,rep){const box=$("#pg");box.innerHTML="";box.hidden=false;
@@ -98,34 +109,30 @@ const mfSet=(d,u)=>{d.outerHTML=mf(d.dataset.n,d.dataset.l,u,d.dataset.f,d.datas
 
 /* ===== Réalisations ===== */
 async function projs(){const{data,error}=await sb.from("projects").select("*").order("position").order("created_at");if(error)throw error;rows=data;
- $("#v").innerHTML=`<p><button data-a="new">Ajouter un projet</button></p>`+(rows.map((p,i)=>`<div class="card"><div class="row"><strong>${esc(p.name)}</strong><span class="tag">${p.status==="publie"?"Publié":"Brouillon"}</span>${p.is_concept?'<span class="tag">Concept NEXORA</span>':""}</div>
+ $("#v").innerHTML=`<p><button data-a="new">Ajouter un projet</button></p>`+(rows.map((p,i)=>`<div class="card"><div class="row"><strong>${esc(p.name)}</strong><span class="tag">${p.status==="publie"?"Publié":"Brouillon"}</span>${p.is_concept?'<span class="tag">Concept NEXORA</span>':""}${p.import_path?'<span class="tag">Site importé</span>':p.site_url?'<span class="tag">URL</span>':""}</div>
  <div class="row" style="margin-top:8px"><button class="o" data-a="edit" data-i="${i}">Modifier</button><button class="o" data-a="tog" data-i="${i}">${p.status==="publie"?"Dépublier":"Publier"}</button><button class="o" data-a="up" data-i="${i}" aria-label="Monter" ${i?"":"disabled"}>↑</button><button class="o" data-a="dn" data-i="${i}" aria-label="Descendre" ${i<rows.length-1?"":"disabled"}>↓</button><a class="b o" href="index.html?preview=1#realisations" target="_blank" rel="noopener">Aperçu</a><button class="r" data-a="del" data-i="${i}">Supprimer</button></div></div>`).join("")||'<div class="card mu">Aucune réalisation. Ajoutez votre premier projet.</div>')}
 function form(p){p=p||{is_concept:true,status:"brouillon",features:[],gallery:[]};
  $("#v").innerHTML=`<form id="pf" class="card"><h2>${p.id?"Modifier":"Ajouter"} un projet</h2>
- <details class="card" style="background:#f4f4ff"><summary>Comment remplir l’aperçu ?</summary>
- <p class="mu">L’aperçu de la section Réalisations accepte cinq sources. Si vous en remplissez plusieurs, celle du haut l’emporte :</p>
- <ol class="mu" style="padding-left:20px">
-  <li><strong>Aperçu local</strong> — le code HTML de votre création, collé. Idéal pour une maquette.</li>
-  <li><strong>Vidéo de présentation</strong> — lecture automatique, en boucle, sans son.</li>
-  <li><strong>URL du site réalisé</strong> — le vrai site, affiché en direct. Certains sites refusent d’être intégrés : prévoyez une capture en secours.</li>
-  <li><strong>Capture ordinateur / mobile</strong> — une image par format.</li>
-  <li><strong>Galerie de photos</strong> — diaporama qui défile tout seul.</li>
- </ol>
- <p class="mu">Si rien n’est rempli, l’aperçu affiche « Aperçu à venir ». L’URL du site sert aussi au bouton « Découvrir le site », même si l’aperçu vient d’ailleurs.</p></details>${pf().map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}"${k==="local_doc"?' rows="12" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:220px"':""}>${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
+ ${presCard(p)}${pf().filter(x=>x[0]!=="site_url").map(([k,l,t])=>`<label>${l}${t==="a"?`<textarea name="${k}"${k==="local_doc"?' rows="12" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:220px"':""}>${esc(k==="features"?(p.features||[]).join("\n"):p[k])}</textarea>`:`<input name="${k}" type="${t}" value="${esc(p[k])}">`}</label>`).join("")}
  ${HASDOC?'<p class="mu">Collez ici le code HTML complet de votre création : il s’affiche dans l’aperçu de la section Réalisations, en format ordinateur comme en format mobile. Prioritaire sur l’URL et les captures.</p><div class="row"><button type="button" class="o" data-a="pvd">Aperçu ordinateur</button><button type="button" class="o" data-a="pvm">Aperçu mobile</button><button type="button" class="o" data-a="pvx">Masquer</button></div><div id="lp"></div>':'<p class="mu">Aperçu local indisponible : la colonne <code>local_doc</code> n’existe pas encore dans la table <code>projects</code>. Exécutez le script SQL fourni, puis rechargez cette page.</p>'}
  ${PM.map(([k,l,f])=>mf(k,l,p[k]||"",f)).join("")}${mf("video_url","Vidéo de présentation — s’affiche dans l’aperçu (MP4 ou WebM, 50 Mo max)",p.video_url||"","videos",1)}
  <label>Galerie de photos — diaporama de l’aperçu, si aucune capture n’est fournie</label><div class="th" id="gl"></div><div class="row"><button type="button" class="o" data-a="ga">Importer des photos</button><button type="button" class="o" data-a="gp">Depuis la bibliothèque</button></div>
  <label><input type="checkbox" name="is_concept" ${p.is_concept?"checked":""}> Concept NEXORA (non livré à un client)</label>
- <label>Statut<select name="status"><option value="brouillon" ${p.status==="brouillon"?"selected":""}>Brouillon</option><option value="publie" ${p.status==="publie"?"selected":""}>Publié</option></select></label>
+ <label>Ordre d’affichage (1 = premier)<input name="pos" type="number" min="1" step="1" value="${p.id?(p.position||0)+1:rows.length+1}"></label>
+  <label>État<select name="status"><option value="brouillon" ${p.status==="brouillon"?"selected":""}>Masqué (brouillon)</option><option value="publie" ${p.status==="publie"?"selected":""}>Publié</option></select></label>
  <p class="row"><button type="submit">Enregistrer</button><button type="button" class="o" data-a="back">Annuler</button></p><p id="fs" class="mu" role="status"></p></form>`;
- const F=$("#pf");F._p=p;F._g=[...(p.gallery||[])];gal(F)}
+ const F=$("#pf");F._p=p;F._g=[...(p.gallery||[])];gal(F);initPres(F,p)}
 const gal=F=>$("#gl").innerHTML=F._g.map((u,i)=>`<span><img class="t" src="${esc(u)}" alt=""><br><button type="button" class="o" data-a="rg" data-k="${i}">Retirer</button></span>`).join("");
 async function save(F){const p=F._p,fd=new FormData(F),s=$("#fs"),b=F.querySelector("[type=submit]");b.disabled=true;
  try{const o={};for(const[k,,t]of pf()){const v=(fd.get(k)||"").trim();o[k]=k==="features"?v.split("\n").map(x=>x.trim()).filter(Boolean):(v||null)}
   if(!o.name)throw new Error("Le nom du projet est obligatoire.");if(o.site_url&&!/^https?:\/\//.test(o.site_url))throw new Error("L’adresse du site doit commencer par https://");
   for(const[k]of[...PM,["video_url"]])o[k]=fd.get(k)||null;o.gallery=F._g;o.is_concept=F.is_concept.checked;o.status=fd.get("status");s.textContent="Enregistrement…";let r;
-  if(p.id)r=await sb.from("projects").update(o).eq("id",p.id);else{o.position=rows.length?Math.max(...rows.map(x=>x.position))+1:0;r=await sb.from("projects").insert(o)}
-  if(r.error)throw r.error;say("Projet enregistré.");projs()}catch(e){s.textContent="Échec : "+e.message;say("Échec : "+e.message,1);b.disabled=false}}
+  const ps=parseInt(fd.get("pos"),10);
+   if(HASPRES){o.presentation=fd.get("presentation")||"auto";o.import_path=F._imp?F._imp.prefix:null;o.preview_meta=Object.assign({},F._meta||{},F._imp?F._imp.meta:{});
+    if(o.presentation==="import"&&!o.import_path)throw new Error("Importez un dossier ou un ZIP, ou changez le type de présentation.");
+    if(o.presentation==="url"&&!o.site_url)throw new Error("Renseignez l’URL du site pour ce type de présentation.")}
+   if(p.id){if(ps>0)o.position=ps-1;r=await sb.from("projects").update(o).eq("id",p.id)}else{o.position=ps>0?ps-1:(rows.length?Math.max(...rows.map(x=>x.position))+1:0);r=await sb.from("projects").insert(o)}
+  if(r.error)throw r.error;F._saved=1;if(HASPRES&&p.import_path&&p.import_path!==o.import_path)await dropPkg(p.import_path);say("Projet enregistré.");projs()}catch(e){s.textContent="Échec : "+e.message;say("Échec : "+e.message,1);b.disabled=false}}
 const swap=async(i,j)=>{const a=rows[i],b=rows[j],r=await Promise.all([sb.from("projects").update({position:j}).eq("id",a.id),sb.from("projects").update({position:i}).eq("id",b.id)]);const e=r.find(x=>x.error);if(e)throw e.error;projs()};
 
 /* ===== Textes, apparence, brouillon / publication ===== */
@@ -158,10 +165,16 @@ async function dash(){const n=(t,f)=>{let q=sb.from(t).select("id",{count:"exact
 
 /* ===== Actions ===== */
 async function act(b){const a=b.dataset.a,p=rows[+b.dataset.i],F=$("#pf");
- if(a==="new")form();else if(a==="edit")form(p);else if(a==="back")projs();
+ if(a==="new")form();else if(a==="edit")form(p);else if(a==="back"){if(F&&F._imp&&F._imp.pending&&!F._saved)await dropPkg(F._imp.prefix);projs()}
  else if(a==="tog"){const{error}=await sb.from("projects").update({status:p.status==="publie"?"brouillon":"publie"}).eq("id",p.id);if(error)throw error;say(p.status==="publie"?"Projet dépublié.":"Projet publié.");projs()}
  else if(a==="up")await swap(+b.dataset.i,+b.dataset.i-1);else if(a==="dn")await swap(+b.dataset.i,+b.dataset.i+1);
- else if(a==="del"&&confirm("Supprimer définitivement « "+p.name+" » ? Les médias restent dans la bibliothèque.")){const{error}=await sb.from("projects").delete().eq("id",p.id);if(error)throw error;say("Projet supprimé.");projs()}
+ else if(a==="del"&&confirm("Supprimer définitivement « "+p.name+" » ? Les médias restent dans la bibliothèque.")){const{error}=await sb.from("projects").delete().eq("id",p.id);if(error)throw error;await dropPkg(p.import_path);say("Projet supprimé.");projs()}
+
+ else if(a==="idir"||a==="izip"){const f=await fid(a==="idir");await doImp(f,F)}
+ else if(a==="idel"){if(!F._imp)return;if(!confirm("Retirer le site importé de ce projet ? Ses fichiers seront supprimés à l’enregistrement."))return;if(F._imp.pending)await dropPkg(F._imp.prefix);F._imp=null;impInfo(F);pvRender()}
+ else if(a==="tst")await tstUrl();else if(a==="pm")await pvRender(b.dataset.pm);else if(a==="prf")await pvRender();
+ else if(a==="emb1"||a==="emb0"){F._meta=F._meta||{};F._meta.embed=a==="emb1"?"ok":"blocked";F._meta.tested_at=new Date().toISOString();
+  $("#nps").innerHTML=a==="emb1"?'<div class="rp ok">✓ Intégration confirmée : le site s’affichera en direct sur le portfolio.</div>':'<div class="rp bad">Intégration refusée par ce site (X-Frame-Options / CSP). Le portfolio affichera vos captures (ajoutez-en ci-dessous) avec un bouton « Découvrir le site ». Pour un affichage complet et synchronisé au défilement, utilisez plutôt l’import du site.</div>'}
  else if(a==="rg"){F._g.splice(+b.dataset.k,1);gal(F)}
  else if(a==="ga"){const f=await fi("image/*",1);F._g.push(...(await upl(f,"galerie")).filter(Boolean));gal(F)}
  else if(a==="gp"){const u=await pick();if(u){F._g.push(u);gal(F)}}
@@ -214,6 +227,145 @@ V.addEventListener("click",e=>{const b=e.target.closest("[data-pa]");if(!b||!$("
  else if(a==="del"){if(!confirm("Supprimer cet élément ?"))return;L.splice(i,1)}
  else{const j=a==="up"?i-1:i+1;[L[i],L[j]]=[L[j],L[i]]}
  prDraw()});
+
+/* ===== Présentation des projets : URL publiée ou site importé (bucket Storage « project-sites ») =====
+   Import : dossier ou ZIP → contrôle des fichiers et des chemins → envoi en conservant l'arborescence (…/src/…)
+   → bundle.html (index.html + <base> vers le dossier + pont postMessage) → vérification réelle du rendu.
+   Supabase sert le HTML en text/plain : le front charge bundle.html par fetch puis l'affiche en srcdoc isolé (sandbox). */
+const PB="project-sites",NXA=Math.random().toString(36).slice(2)+Date.now().toString(36);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)],pubBase=p=>`${C.SUPABASE_URL}/storage/v1/object/public/${PB}/${p}`;
+const MT={html:"text/html",htm:"text/html",css:"text/css",js:"text/javascript",mjs:"text/javascript",json:"application/json",svg:"image/svg+xml",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",avif:"image/avif",ico:"image/x-icon",woff:"font/woff",woff2:"font/woff2",ttf:"font/ttf",otf:"font/otf",mp4:"video/mp4",webm:"video/webm",mp3:"audio/mpeg",wav:"audio/wav",txt:"text/plain",xml:"application/xml",webmanifest:"application/manifest+json",map:"application/json",pdf:"application/pdf"};
+const ext=n=>(n.split(".").pop()||"").toLowerCase(),TXT=/^(html?|css|m?js|json|svg|xml|txt|webmanifest)$/,SKIP=/(^|\/)(__MACOSX|\.git|node_modules)(\/|$)|(^|\/)(\.DS_Store|Thumbs\.db)$/;
+const segOK=s=>s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9._-]+/g,"_");
+const fid=dir=>new Promise(r=>{const i=document.createElement("input");i.type="file";if(dir)i.webkitdirectory=true;else i.accept=".zip,application/zip";i.onchange=()=>r([...i.files]);i.click()});
+let _zp;const loadZip=()=>window.JSZip?Promise.resolve():_zp||(_zp=new Promise((ok,ko)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";s.onload=ok;s.onerror=()=>ko(new Error("JSZip n’a pas pu être chargé (réseau)"));document.head.append(s)}));
+
+/* Pont injecté dans index.html. Origine du parent et nonce remplacés à l'affichage (__NXO__ / __NXN__). N'accepte que le parent. */
+const BRIDGE=`(function(){var PO="__NXO__",N="__NXN__",P=parent,T=0,Y=0,R=0,E=[];
+function S(t,x){try{var m={nx:1,n:N,t:t};for(var k in x)m[k]=x[k];P.postMessage(m,PO)}catch(_){}}
+addEventListener("error",function(e){var t=e.target;if(t&&t!==window&&t.localName){var u=t.src||t.href;if(u)E.push(t.localName+" : "+u)}else if(e.message)E.push("JS : "+e.message)},true);
+addEventListener("unhandledrejection",function(e){E.push("Promesse rejetée : "+(e.reason&&e.reason.message||e.reason))});
+addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented)return;var h=a.getAttribute("href")||"";
+if(h.charAt(0)==="#"){e.preventDefault();var id=decodeURIComponent(h.slice(1)),el=id&&(document.getElementById(id)||document.getElementsByName(id)[0]);if(el)el.scrollIntoView();else scrollTo(0,0);return}
+if(/^(mailto:|tel:|javascript:)/i.test(h))return;
+e.preventDefault();if(/^https?:/i.test(a.href)&&a.href.indexOf(document.baseURI)!==0)window.open(a.href,"_blank","noopener")},true);
+function st(){R=0;var d=T-Y;if(Math.abs(d)<.5)Y=T;else{Y+=d*.2;R=requestAnimationFrame(st)}scrollTo(0,Y)}
+addEventListener("scroll",function(){if(!R)Y=T=scrollY},{passive:true});
+addEventListener("message",function(e){var d=e.data;if(e.source!==P||e.origin!==PO||!d||d.nx!==1||d.n!==N||d.t!=="scroll")return;
+var m=document.documentElement.scrollHeight-innerHeight;T=Math.max(0,Math.min(1,+d.q||0))*Math.max(0,m);if(!R)R=requestAnimationFrame(st)});
+addEventListener("load",function(){document.documentElement.style.scrollBehavior="auto";S("ready",{h:document.documentElement.scrollHeight,e:E.slice(0,30)})});
+})();`;
+function mkBundle(html,base){html=html.replace(/<base\b[^>]*>/gi,"");const inj=`<base href="${base}"><script>${BRIDGE}<\/script>`;
+ return /<head\b[^>]*>/i.test(html)?html.replace(/<head\b[^>]*>/i,m=>m+inj):/<html\b[^>]*>/i.test(html)?html.replace(/<html\b[^>]*>/i,m=>m+"<head>"+inj+"</head>"):inj+html}
+
+/* 1) lecture : dossier (webkitRelativePath) ou ZIP ; racine = dossier contenant index.html */
+async function readSrc(fl){const MAXF=600,MAXB=80*1048576;let L=[];const W=[];
+ if(fl.length===1&&/\.zip$/i.test(fl[0].name)){await loadZip();const z=await JSZip.loadAsync(fl[0]);let tot=0;
+  for(const[n,o]of Object.entries(z.files)){if(o.dir)continue;tot+=(o._data&&o._data.uncompressedSize)||0;if(tot>MAXB)throw new Error("Archive trop volumineuse une fois décompressée (80 Mo maximum).");L.push({p:n,get:()=>o.async("blob")})}}
+ else L=fl.map(f=>({p:f.webkitRelativePath||f.name,get:async()=>f}));
+ L=L.map(x=>({...x,p:x.p.replace(/\\/g,"/").replace(/^\/+/,"")})).filter(x=>!SKIP.test(x.p));
+ if(L.some(x=>x.p.split("/").includes("..")))throw new Error("Chemins invalides (« .. ») dans l’import.");
+ const ix=L.filter(x=>/(^|\/)index\.html$/i.test(x.p)).sort((a,b)=>a.p.split("/").length-b.p.split("/").length)[0];
+ if(!ix)throw new Error("Aucun fichier index.html : le dossier ou l’archive doit contenir le point d’entrée du site.");
+ const root=ix.p.slice(0,ix.p.length-10),out=L.filter(x=>x.p.startsWith(root));
+ if(out.length<L.length)W.push((L.length-out.length)+" fichier(s) situé(s) hors du dossier de index.html ignoré(s).");
+ if(out.length>MAXF)throw new Error(`Trop de fichiers (${out.length}, maximum ${MAXF}).`);
+ const F=new Map();let bytes=0;
+ for(const x of out){const b=await x.get(),rel=x.p.slice(root.length);bytes+=b.size;if(bytes>MAXB)throw new Error("Import supérieur à 80 Mo.");if(b.size>20971520)throw new Error(`« ${rel} » dépasse 20 Mo.`);F.set(rel,b)}
+ return{F,W,bytes}}
+/* 2) noms sûrs pour le Storage (accents, espaces…) : mêmes renommages appliqués aux références des fichiers texte */
+async function prep(F){const ren={},seen=new Map(),R=[];
+ for(const[p]of F){const q=p.split("/").map(s=>{const n=segOK(s);if(n!==s)ren[s]=n;return n}).join("/"),k=q.toLowerCase();
+  if(seen.has(k))throw new Error(`Conflit de noms : « ${p} » et « ${seen.get(k)} » deviendraient identiques.`);seen.set(k,p);R.push([p,q])}
+ const G=new Map(),rn=Object.entries(ren);
+ for(const[p,q]of R){let b=F.get(p);if(rn.length&&TXT.test(ext(q))){let t=await b.text();for(const[o,n]of rn)for(const v of new Set([o,encodeURIComponent(o),encodeURI(o)]))t=t.split(v).join(n);b=new Blob([t],{type:b.type})}G.set(q,b)}
+ return{G,ren}}
+/* 3) contrôle des ressources référencées (HTML + CSS) : introuvables, chemins absolus, http://, pages secondaires */
+async function check(G,entry){const M=[],H=[],P=new Set(),X=new Set();
+ const res=(from,r)=>{r=(r||"").trim();if(!r||/^(#|data:|blob:|mailto:|tel:|javascript:|about:)/i.test(r))return;
+  if(/^(https?:)?\/\//i.test(r)){try{X.add(new URL(r,"https://x").hostname)}catch(_){}if(/^http:/i.test(r))H.push(r);return}
+  if(r[0]==="/"){M.push(r+" (chemin absolu depuis la racine : utilisez un chemin relatif)");return}
+  let q=r.split(/[?#]/)[0];try{q=decodeURIComponent(q)}catch(_){}if(!q)return;
+  const path=new URL(q,"http://h/"+from.replace(/[^/]*$/,"")).pathname.slice(1).split("/").map(segOK).join("/");
+  if(!G.has(path)){const ci=[...G.keys()].find(k=>k.toLowerCase()===path.toLowerCase());M.push(ci?`${r} (casse différente de « ${ci} » : fonctionne en local, échoue en ligne)`:r)}};
+ const css=(from,t)=>{for(const m of t.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)|@import\s+['"]([^'"]+)/g))res(from,m[1]||m[2])};
+ const d=new DOMParser().parseFromString(await G.get(entry).text(),"text/html");
+ d.querySelectorAll("[src],[href],[poster],[data-src],[srcset]").forEach(el=>{const t=el.localName;
+  if(t!=="a"&&t!=="area"){["src","poster","data-src"].forEach(a=>el.hasAttribute(a)&&res(entry,el.getAttribute(a)));if(t==="link"||t==="image"||t==="use")res(entry,el.getAttribute("href"))}
+  (el.getAttribute("srcset")||"").split(",").forEach(s=>res(entry,s.trim().split(/\s+/)[0]))});
+ d.querySelectorAll("a[href]").forEach(a=>{const h=a.getAttribute("href")||"";if(/\.html?([?#]|$)/i.test(h)&&!/^(https?:)?\/\//i.test(h))P.add(h.split(/[?#]/)[0])});
+ d.querySelectorAll("[style]").forEach(el=>css(entry,el.getAttribute("style")));d.querySelectorAll("style").forEach(s=>css(entry,s.textContent));
+ for(const[p,b]of G)if(ext(p)==="css")css(p,await b.text());
+ return{missing:[...new Set(M)],http:[...new Set(H)],pages:[...P],hosts:[...X]}}
+/* suppression d'un import (liste récursive du dossier du projet) */
+async function lsr(p){const{data}=await sb.storage.from(PB).list(p,{limit:1000});let o=[];for(const e of data||[])o=o.concat(e.id?[p+"/"+e.name]:await lsr(p+"/"+e.name));return o}
+async function dropPkg(pf){if(!pf||!HASBK)return;try{const L=await lsr(pf);for(let i=0;i<L.length;i+=100){const{error}=await sb.storage.from(PB).remove(L.slice(i,i+100));if(error)throw error}}catch(e){say("Anciens fichiers non supprimés : "+e.message,1)}}
+/* import complet : analyse → envoi → bundle → aperçu vérifié */
+async function doImp(fl,F){if(!fl.length)return;const ir=$("#ir"),st=t=>ir.innerHTML=`<p class="mu"><i class="sp"></i>${t}</p>`;
+ try{st("Lecture et analyse des fichiers…");const{F:S,W,bytes}=await readSrc(fl),{G,ren}=await prep(S),entry=[...G.keys()].find(k=>k.toLowerCase()==="index.html"),ck=await check(G,entry);
+  if(ck.missing.length&&!confirm(`${ck.missing.length} ressource(s) référencée(s) par le site sont introuvables dans l’import :\n\n${ck.missing.slice(0,10).join("\n")}\n\nImporter quand même ?`)){ir.innerHTML='<div class="rp bad">Import annulé : ajoutez les fichiers manquants, puis réessayez.</div>';return}
+  if(F._imp&&F._imp.pending)await dropPkg(F._imp.prefix);
+  const prefix=`sites/${F._p.id||"new"}-${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}`,base=pubBase(prefix)+"/src/",q=[...G],tot=q.length;let n=0;
+  try{await Promise.all(Array.from({length:5},async()=>{for(let j;(j=q.shift());){await xup(new Blob([j[1]],{type:MT[ext(j[0])]||"application/octet-stream"}),`${prefix}/src/${j[0]}`,false,()=>{},PB);st(`Envoi des fichiers ${++n}/${tot}…`)}}));
+   const html=await G.get(entry).text();
+   await xup(new Blob([JSON.stringify({v:1,entry,files:[...G.keys()],bytes})],{type:"application/json"}),`${prefix}/manifest.json`,false,()=>{},PB);
+   await xup(new Blob([mkBundle(html,base)],{type:"text/html"}),`${prefix}/bundle.html`,false,()=>{},PB)}
+  catch(e){q.length=0;await new Promise(r=>setTimeout(r,600));await dropPkg(prefix);throw e}
+  F._imp={prefix,pending:true,meta:{entry,files:tot,bytes,renamed:Object.keys(ren).length,missing:ck.missing,http:ck.http,pages:ck.pages,hosts:ck.hosts,warnings:W,at:new Date().toISOString(),verified:null}};
+  if(F.presentation.value!=="import")F.presentation.value="import";
+  impInfo(F);await pvRender("d")}
+ catch(e){ir.innerHTML=`<div class="rp bad">Import impossible : ${esc(e.message)}${/bucket|not found|policy|row-level|unauthor/i.test(e.message)?"<br>Vérifiez que le script SQL fourni a été exécuté (bucket project-sites et politiques).":""}</div>`}}
+function impInfo(F){const i=F._imp,m=i&&i.meta,ir=$("#ir");if(!m||!m.files){ir.innerHTML='<p class="mu">Aucun site importé pour ce projet.</p>';return}
+ ir.innerHTML=`<div class="rp"><strong>Site importé</strong> · ${m.files} fichier(s) · ${m.bytes<1048576?Math.max(1,Math.round(m.bytes/1024))+" Ko":(m.bytes/1048576).toFixed(1)+" Mo"} · ${fmt(m.at)}${i.pending?" · <em>non enregistré</em>":""}
+${m.renamed?`<br>↳ ${m.renamed} nom(s) normalisé(s) (accents, espaces…) ; références mises à jour.`:""}
+${m.missing&&m.missing.length?`<br><span style="color:#b3261e">⚠ ${m.missing.length} ressource(s) introuvable(s) : ${m.missing.slice(0,6).map(esc).join(" · ")}</span>`:""}
+${m.http&&m.http.length?`<br>⚠ ${m.http.length} ressource(s) en http:// (bloquées en https).`:""}
+${m.pages&&m.pages.length?`<br>ℹ Seule index.html est présentée ; pages liées non affichées : ${m.pages.slice(0,5).map(esc).join(", ")}`:""}
+${(m.warnings||[]).map(w=>"<br>ℹ "+esc(w)).join("")}</div>`}
+
+/* aperçu dans l'administration : même moteur que le site public (viewport virtuel + échelle), avec chargement, erreurs, vérification */
+async function pvRender(m,force){const F=$("#pf");if(!F||!F.presentation)return;m=m||F._pm||"d";F._pm=m;const box=$("#npv"),st=$("#nps"),pr=force||F.presentation.value,url=(F.site_url.value||"").trim(),imp=F._imp&&F._imp.prefix;
+ const useImp=pr==="import"||(pr==="auto"&&imp&&!url),useUrl=!useImp&&(pr==="url"||pr==="auto")&&url;
+ const so=useUrl&&(()=>{try{return new URL(url,location.href).origin===location.origin}catch(_){return true}})();
+ $$("[data-pm]").forEach(b=>b.classList.toggle("o",b.dataset.pm!==m));clearTimeout(F._pt);const tk=F._tk=(F._tk||0)+1;
+ if(!useImp&&!useUrl){const u=(m==="m"&&F.mobile_shot.value)||F.desktop_shot.value||F.cover_url.value;box.innerHTML=u?`<img src="${esc(u)}" alt="" style="max-width:100%;border-radius:10px">`:'<p class="mu">Rien à prévisualiser : renseignez une URL, importez un site ou ajoutez des captures.</p>';st.innerHTML="";return}
+ if(useImp&&!imp){box.innerHTML="";st.innerHTML='<div class="rp bad">Aucun site importé : choisissez un dossier ou un ZIP.</div>';return}
+ const W=Math.max(240,box.clientWidth||520),d=m==="m"?{ow:Math.min(300,W),pad:8,bar:0,vw:390}:{ow:W,pad:0,bar:26,vw:1280};d.oh=m==="m"?d.ow*2.02:W*.62;
+ const k=(d.ow-2*d.pad)/d.vw,vh=(d.oh-2*d.pad-d.bar)/k;
+ box.innerHTML=`<div class="npd ${m}" style="width:${d.ow}px;height:${d.oh}px;padding:${d.pad}px"><div class="npb"><i></i><i></i><i></i></div><div class="ns"><iframe title="Aperçu" sandbox="${useUrl&&!so?"allow-scripts allow-same-origin allow-forms allow-popups":"allow-scripts allow-forms allow-popups"}" referrerpolicy="no-referrer" style="width:${d.vw}px;height:${vh}px;transform:scale(${k})"></iframe><div class="nl"><span><i class="sp"></i>Chargement du site…</span></div></div></div>`;
+ const f=$("iframe",box),nl=()=>$(".nl",box),t0=performance.now();st.innerHTML="";
+ if(useUrl){f.onload=()=>{if(tk!==F._tk)return;clearTimeout(F._pt);nl()&&nl().remove();const s=F._meta&&F._meta.embed;
+   st.innerHTML=`<div class="rp">${so?"<em>Même domaine que NEXORA : le site est affiché isolé (sans stockage local) pour protéger votre session.</em><br>":""}Le site a répondu en ${((performance.now()-t0)/1000).toFixed(1)} s. S’affiche-t-il correctement dans l’aperçu ?${s==="ok"?" <strong>(confirmé)</strong>":s==="blocked"?" <strong>(marqué comme refusé)</strong>":""}<div class="row" style="margin-top:6px"><button type="button" data-a="emb1">Oui, il s’affiche</button><button type="button" class="o" data-a="emb0">Non : écran vide ou refusé</button></div></div>`};
+  F._pt=setTimeout(()=>{if(tk===F._tk&&nl())nl().innerHTML='<span>Aucune réponse après 12 s.<br>Site lent ou injoignable, ou intégration refusée (X-Frame-Options / CSP). Utilisez « Non » ci-dessous si l’écran reste vide.</span>'},12000);f.src=url;return}
+ try{const r=await fetch(pubBase(imp)+"/bundle.html",{cache:"no-store"});if(!r.ok)throw new Error("fichier bundle.html introuvable (HTTP "+r.status+")");
+  const h=await r.text();if(tk!==F._tk)return;f.srcdoc=h.replace("__NXO__",location.origin).replace("__NXN__",NXA);
+  F._pt=setTimeout(()=>{if(tk!==F._tk)return;const mm=F._imp&&F._imp.meta;if(mm)mm.verified=false;nl()&&(nl().innerHTML="<span>Le site n’a pas signalé son chargement après 15 s.<br>Un script bloque peut-être le rendu : vérifiez la console du site d’origine.</span>");st.innerHTML='<div class="rp bad">⚠ Chargement non confirmé : le site importé ne répond pas dans le cadre isolé.</div>'},15000)}
+ catch(e){nl()&&(nl().innerHTML=`<span>${esc(e.message)}</span>`);st.innerHTML=`<div class="rp bad">Aperçu impossible : ${esc(e.message)}</div>`}}
+function pvDone(er){const F=$("#pf");if(!F)return;clearTimeout(F._pt);const n=$(".nl",$("#npv"));n&&n.remove();const mm=F._imp&&F._imp.meta;if(mm){mm.verified=true;mm.loadErrors=er}
+ $("#nps").innerHTML=er.length?`<div class="rp bad">⚠ Le site s’affiche, mais ${er.length} ressource(s) ou script(s) posent problème :<br>${er.slice(0,8).map(esc).join("<br>")}</div>`:'<div class="rp ok">✓ Vérifié : le site importé s’est chargé dans le cadre isolé, sans erreur de ressource.</div>'}
+addEventListener("message",e=>{const d=e.data,fr=$("#npv iframe");if(!fr||e.source!==fr.contentWindow||e.origin!=="null"||!d||d.nx!==1||d.n!==NXA||d.t!=="ready")return;pvDone(Array.isArray(d.e)?d.e.slice(0,20).map(String):[])});
+async function tstUrl(){const F=$("#pf"),u=(F.site_url.value||"").trim(),st=$("#nps");
+ if(!/^https:\/\/[^\s]+$/i.test(u)){st.innerHTML='<div class="rp bad">Adresse invalide : elle doit commencer par https:// (les pages http sont bloquées sur un site sécurisé).</div>';return}
+ st.innerHTML='<p class="mu"><i class="sp"></i>Vérification de l’adresse…</p>';
+ try{const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);await fetch(u,{mode:"no-cors",cache:"no-store",signal:c.signal});clearTimeout(t)}
+ catch(e){st.innerHTML='<div class="rp bad">Site injoignable : adresse erronée, site hors ligne, ou bloqué par le navigateur.</div>';return}
+ await pvRender(F._pm||"d","url")}
+function presCard(p){if(!HASPRES)return'<div class="card" style="background:#fff7e6"><strong>Présentation avancée indisponible.</strong><p class="mu">Les colonnes <code>presentation</code>, <code>import_path</code> et <code>preview_meta</code> n’existent pas encore dans la table <code>projects</code>. Exécutez le script SQL fourni (étape 1), puis rechargez cette page. En attendant, l’URL fonctionne comme avant.</p><label>URL du site réalisé<input name="site_url" type="url" value="'+esc(p.site_url)+'"></label></div>';
+ const off=HASBK?"":"disabled";
+ return`<div class="card" style="background:#f4f4ff"><h2 style="font-size:1.1rem">Présentation du site</h2>
+<label>Type de présentation<select name="presentation"><option value="auto">Automatique (import › vidéo › URL › captures)</option><option value="url">URL d’un site déjà publié (recommandé)</option><option value="import">Site importé (dossier ou ZIP)</option><option value="capture">Captures d’écran uniquement</option></select></label>
+<label>URL du site réalisé<input name="site_url" type="url" inputmode="url" placeholder="https://exemple.github.io/mon-site/" value="${esc(p.site_url)}"></label>
+<p class="row" style="margin-top:8px"><button type="button" class="o" data-a="tst">Tester l’URL</button><span class="mu">Charge le vrai site dans l’aperçu ci-dessous.</span></p>
+<label>Import d’un site (index.html + CSS, JS, images, polices…)</label>
+${HASBK?"":'<div class="rp bad">Bucket <code>project-sites</code> introuvable ou inaccessible : exécutez le script SQL fourni (étape 2). L’import est désactivé.</div>'}
+<p class="row"><button type="button" class="o" data-a="idir" ${off}>Importer un dossier</button><button type="button" class="o" data-a="izip" ${off}>Importer un ZIP</button><button type="button" class="r" data-a="idel" ${off}>Retirer l’import</button></p>
+<p class="mu">Le dossier ou le ZIP doit contenir <code>index.html</code>. L’arborescence et les chemins relatifs sont conservés. Sur iPhone/iPad, utilisez un ZIP.</p><div id="ir"></div>
+<p class="row" style="margin-top:12px"><strong>Aperçu</strong><button type="button" data-a="pm" data-pm="d">Ordinateur</button><button type="button" class="o" data-a="pm" data-pm="m">Mobile</button><button type="button" class="o" data-a="prf">Actualiser</button></p>
+<div id="nps" role="status"></div><div id="npv"></div></div>`}
+function initPres(F,p){if(!HASPRES)return;F.presentation.value=p.presentation||"auto";F._meta=Object.assign({},p.preview_meta&&!p.preview_meta.files?p.preview_meta:{});
+ F._imp=p.import_path?{prefix:p.import_path,meta:p.preview_meta||{}}:null;impInfo(F);
+ if(p.id&&(p.import_path||p.site_url||p.desktop_shot||p.cover_url))pvRender("d")}
+V.addEventListener("input",e=>{if(e.target.name==="site_url"){const F=$("#pf");if(F&&F._meta)delete F._meta.embed}});
 
 if(!C.SUPABASE_URL||!C.SUPABASE_ANON_KEY||!window.supabase){view("login");say("config.js n’est pas renseigné : ajoutez SUPABASE_URL et SUPABASE_ANON_KEY.",1)}
 else{sb=window.supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);enter()}
